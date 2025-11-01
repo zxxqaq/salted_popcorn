@@ -148,6 +148,7 @@ def load_food_documents(csv_path: Path) -> List[Document]:
 
 
 def demonstrate_sample_query(data_dir: Path) -> None:
+    # TODO: env parameter config
     items_path = data_dir / "5k_items_curated.csv"
     queries_path = data_dir / "queries.csv"
 
