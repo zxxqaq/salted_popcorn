@@ -4,3 +4,6 @@
 .vscode/
 
 data
+docs
+
+scripts/score_with_llm.py

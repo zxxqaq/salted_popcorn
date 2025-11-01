@@ -11,12 +11,20 @@ from rank_bm25 import BM25Okapi
 
 
 TOKEN_PATTERN = re.compile(
-    r"[0-9]+(?:\.[0-9]+)*|[A-Za-zÀ-ÖØ-öø-ÿ0-9_']+"
+    r"[0-9]+(?:\.[0-9]+)*|[A-Za-zÀ-ÖØ-öø-ÿ0-9']+"
 )
 
-# do not sepereate .numbers, not_vegan, words
 def tokenize(text: str) -> List[str]:
-    return TOKEN_PATTERN.findall(text.lower())
+    """
+    Tokenize text by splitting on underscores and other delimiters.
+    
+    This ensures that "not_vegan" is tokenized as ["not", "vegan"]
+    instead of ["not_vegan"], allowing queries like "not vegan" to match.
+    """
+    # Replace underscores with spaces so they act as word separators
+    text_normalized = text.replace("_", " ")
+    tokens = TOKEN_PATTERN.findall(text_normalized.lower())
+    return tokens
 
 
 def build_candidate_text(metadata: dict) -> str:

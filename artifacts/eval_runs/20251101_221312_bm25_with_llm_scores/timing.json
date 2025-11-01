@@ -1,0 +1,10 @@
+{
+  "query_count": 10,
+  "skipped_query_count": 0,
+  "avg_latency_ms": 0.24845812004059553,
+  "median_latency_ms": 0.2527290489524603,
+  "p95_latency_ms": 0.326395477168262,
+  "p99_latency_ms": 0.3370453556999564,
+  "min_latency_ms": 0.12941588647663593,
+  "max_latency_ms": 0.33970782533288
+}

@@ -137,19 +137,68 @@ def load_config(path: Path) -> dict:
         return tomllib.load(f)
 
 
-def load_test_data(test_path: Path, min_relevance: int) -> Dict[str, QueryRecord]:
+def load_test_data(test_path: Path, min_relevance: float, queries_path: Path = None) -> Dict[str, QueryRecord]:
+    """
+    Load test data from CSV file(s).
+    
+    If queries_path is provided, expects test_path to have format: query_id,item_id,score
+    and queries_path to have format: id,search_term_pt (or similar).
+    Otherwise, expects test_path to have format: query_id,query_text,item_id,score
+    """
     queries: Dict[str, QueryRecord] = {}
-    with test_path.open(encoding="utf-8") as f:
-        reader = csv.DictReader(f)
-        for row in reader:
-            query_id = row["query_id"]
-            text = row["query_text"]
-            doc_id = row["item_id"]
-            relevance = float(row.get("score", 0) or 0)
-            if query_id not in queries:
-                queries[query_id] = QueryRecord(query_id=query_id, text=text, relevance={})
-            if relevance >= min_relevance:
-                queries[query_id].relevance[doc_id] = relevance
+    
+    # If queries_path is provided, we're loading from separate files
+    if queries_path and queries_path.exists():
+        # Load query texts first
+        query_texts: Dict[str, str] = {}
+        with queries_path.open(encoding="utf-8") as f:
+            reader = csv.DictReader(f)
+            for row in reader:
+                query_id = row.get("id") or row.get("query_id")
+                text = row.get("search_term_pt") or row.get("query") or row.get("text") or row.get("query_text")
+                if query_id and text:
+                    query_texts[query_id] = text
+        
+        # Load scores
+        with test_path.open(encoding="utf-8") as f:
+            reader = csv.DictReader(f)
+            for row in reader:
+                query_id = row["query_id"]
+                doc_id = row["item_id"]
+                score_str = row.get("score", "").strip()
+                
+                # Skip empty scores
+                if not score_str:
+                    continue
+                    
+                try:
+                    relevance = float(score_str)
+                except ValueError:
+                    continue
+                
+                # Get query text from the queries file
+                text = query_texts.get(query_id, "")
+                if not text:
+                    continue  # Skip if query text not found
+                
+                if query_id not in queries:
+                    queries[query_id] = QueryRecord(query_id=query_id, text=text, relevance={})
+                if relevance >= min_relevance:
+                    queries[query_id].relevance[doc_id] = relevance
+    else:
+        # Original format: query_id,query_text,item_id,score in single file
+        with test_path.open(encoding="utf-8") as f:
+            reader = csv.DictReader(f)
+            for row in reader:
+                query_id = row["query_id"]
+                text = row.get("query_text", "")
+                doc_id = row["item_id"]
+                relevance = float(row.get("score", 0) or 0)
+                if query_id not in queries:
+                    queries[query_id] = QueryRecord(query_id=query_id, text=text, relevance={})
+                if relevance >= min_relevance:
+                    queries[query_id].relevance[doc_id] = relevance
+    
     return queries
 
 
@@ -189,14 +238,21 @@ def evaluate(config_path: Path) -> None:
     ks: List[int] = sorted(set(eval_cfg.get("ks", [10])))
     max_k = max(ks)
     metrics_requested = set(eval_cfg.get("metrics", ["precision", "recall", "ndcg"]))
-    min_rel = int(eval_cfg.get("min_relevance", 1))
+    min_rel = float(eval_cfg.get("min_relevance", 0.5))  # Support float for LLM scores (0-10 scale)
 
     test_path = Path(data_cfg["test_path"])
     if not test_path.exists():
         raise FileNotFoundError(f"Test file not found: {test_path}")
+    
+    # Check if queries_path is provided (for separate scores and queries files)
+    queries_path = None
+    if "queries_path" in data_cfg:
+        queries_path = Path(data_cfg["queries_path"])
+        if not queries_path.exists():
+            raise FileNotFoundError(f"Queries file not found: {queries_path}")
 
     # Load evaluation data
-    query_records = load_test_data(test_path, min_rel)
+    query_records = load_test_data(test_path, min_rel, queries_path=queries_path)
     if not query_records:
         raise ValueError("No queries with relevance >= min_relevance found in test data.")
 
