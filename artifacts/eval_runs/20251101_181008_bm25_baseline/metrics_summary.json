@@ -1,0 +1,64 @@
+{
+  "config": {
+    "retriever": {
+      "type": "bm25",
+      "items_path": "data/raw/5k_items_curated.csv",
+      "params": {
+        "k1": 1.5,
+        "b": 0.75
+      }
+    },
+    "data": {
+      "test_path": "data/test.csv"
+    },
+    "evaluation": {
+      "ks": [
+        5,
+        10,
+        20
+      ],
+      "metrics": [
+        "precision",
+        "recall",
+        "ndcg",
+        "map",
+        "mrr"
+      ],
+      "min_relevance": 0.5
+    },
+    "output": {
+      "dir": "artifacts/eval_runs",
+      "tag": "bm25_baseline"
+    }
+  },
+  "query_count": 11,
+  "skipped_queries": [],
+  "metrics": {
+    "precision@5": 1.0,
+    "recall@5": 0.25,
+    "ndcg@5": 0.5968470891955983,
+    "precision@10": 1.0,
+    "recall@10": 0.5,
+    "ndcg@10": 0.6710071995992313,
+    "precision@20": 1.0,
+    "recall@20": 1.0,
+    "ndcg@20": 0.8298780796890025,
+    "average_precision": 1.0,
+    "reciprocal_rank": 1.0
+  },
+  "coverage": {
+    "coverage@5": 1.0,
+    "coverage@10": 1.0,
+    "coverage@20": 1.0
+  },
+  "timing": {
+    "query_count": 11,
+    "skipped_query_count": 0,
+    "avg_latency_ms": 2.4762119970877063,
+    "median_latency_ms": 2.5713329669088125,
+    "p95_latency_ms": 3.2225624890998006,
+    "p99_latency_ms": 3.5340124974027276,
+    "min_latency_ms": 1.657417044043541,
+    "max_latency_ms": 3.6118749994784594
+  }
+}

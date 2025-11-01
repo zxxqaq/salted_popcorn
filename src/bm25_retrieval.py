@@ -19,7 +19,7 @@ def tokenize(text: str) -> List[str]:
     return TOKEN_PATTERN.findall(text.lower())
 
 
-def build_document_text(metadata: dict) -> str:
+def build_candidate_text(metadata: dict) -> str:
     pieces: List[str] = []
 
     name = metadata.get("name")
@@ -89,8 +89,8 @@ def build_document_text(metadata: dict) -> str:
 
 
 @dataclass
-class Document:
-    doc_id: str
+class Candidates:
+    id: str
     name: str
     text: str
     tokens: List[str]
@@ -98,11 +98,11 @@ class Document:
 
 class BM25Retriever:
     # TODO: k1, b
-    def __init__(self, documents: Sequence[Document], k1: float = 1.5, b: float = 0.75) -> None:
-        self.documents = list(documents)
-        self._bm25 = BM25Okapi([doc.tokens for doc in self.documents], k1=k1, b=b)
+    def __init__(self, candidate: Sequence[Candidates], k1: float = 1.5, b: float = 0.75) -> None:
+        self.candidates = list(candidate)
+        self._bm25 = BM25Okapi([doc.tokens for doc in self.candidates], k1=k1, b=b)
     # TODO: top_k
-    def search(self, query: str, top_k: int = 10) -> List[Tuple[Document, float]]:
+    def search(self, query: str, top_k: int = 10) -> List[Tuple[Candidates, float]]:
         query_tokens = tokenize(query)
         if not query_tokens:
             return []
@@ -113,18 +113,18 @@ class BM25Retriever:
             key=lambda item: item[1],
             reverse=True,
         )
-        results: List[Tuple[Document, float]] = []
+        results: List[Tuple[Candidates, float]] = []
         for idx, score in ranked:
             if score <= 0:
                 break
-            results.append((self.documents[idx], score))
+            results.append((self.candidates[idx], score))
             if len(results) >= top_k:
                 break
         return results
 
 
-def load_food_documents(csv_path: Path) -> List[Document]:
-    documents: List[Document] = []
+def load_food_candidates(csv_path: Path) -> List[Candidates]:
+    candidates: List[Candidates] = []
     with csv_path.open(newline="", encoding="utf-8") as f:
         reader = csv.DictReader(f)
         for row in reader:
@@ -132,19 +132,19 @@ def load_food_documents(csv_path: Path) -> List[Document]:
             if not raw:
                 continue
             metadata = json.loads(raw)
-            text = build_document_text(metadata)
+            text = build_candidate_text(metadata)
             tokens = tokenize(text)
             if not tokens:
                 continue
-            documents.append(
-                Document(
-                    doc_id=row.get("itemId", ""),
+            candidates.append(
+                Candidates(
+                    id=row.get("itemId", ""),
                     name=metadata.get("name", ""),
                     text=text,
                     tokens=tokens,
                 )
             )
-    return documents
+    return candidates
 
 
 def demonstrate_sample_query(data_dir: Path) -> None:
@@ -152,8 +152,8 @@ def demonstrate_sample_query(data_dir: Path) -> None:
     items_path = data_dir / "5k_items_curated.csv"
     queries_path = data_dir / "queries.csv"
 
-    documents = load_food_documents(items_path)
-    retriever = BM25Retriever(documents)
+    candidates = load_food_candidates(items_path)
+    retriever = BM25Retriever(candidates)
 
     with queries_path.open(newline="", encoding="utf-8") as f:
         reader = csv.DictReader(f)
@@ -165,7 +165,7 @@ def demonstrate_sample_query(data_dir: Path) -> None:
     print(f"sample: {query}")
     print("\nTop-5 results:")
     for rank, (doc, score) in enumerate(results, start=1):
-        print(f"{rank}. score={score:.4f} itemId={doc.doc_id} name={doc.name} tokens={doc.tokens}")
+        print(f"{rank}. score={score:.4f} itemId={doc.id} name={doc.name} tokens={doc.tokens}")
 
 
 if __name__ == "__main__":
