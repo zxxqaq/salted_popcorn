@@ -43,7 +43,8 @@ from src.bm25_retrieval import BM25Retriever, Candidates, load_food_candidates
 class QueryRecord:
     query_id: str
     text: str
-    relevance: Dict[str, float]
+    relevance: Dict[str, float]  # Filtered relevance (for Precision/Recall)
+    relevance_all: Dict[str, float]  # All relevance scores including 0 (for NDCG)
 
 
 @dataclass
@@ -137,13 +138,22 @@ def load_config(path: Path) -> dict:
         return tomllib.load(f)
 
 
-def load_test_data(test_path: Path, min_relevance: float, queries_path: Path = None) -> Dict[str, QueryRecord]:
+def load_test_data(
+    test_path: Path, 
+    min_relevance: float, 
+    min_relevance_ndcg: float = 0.0,
+    queries_path: Path = None
+) -> Dict[str, QueryRecord]:
     """
     Load test data from CSV file(s).
     
     If queries_path is provided, expects test_path to have format: query_id,item_id,score
     and queries_path to have format: id,search_term_pt (or similar).
     Otherwise, expects test_path to have format: query_id,query_text,item_id,score
+    
+    Args:
+        min_relevance: Minimum relevance score for Precision/Recall metrics
+        min_relevance_ndcg: Minimum relevance score for NDCG (default 0.0 to include all scores)
     """
     queries: Dict[str, QueryRecord] = {}
     
@@ -182,7 +192,18 @@ def load_test_data(test_path: Path, min_relevance: float, queries_path: Path = N
                     continue  # Skip if query text not found
                 
                 if query_id not in queries:
-                    queries[query_id] = QueryRecord(query_id=query_id, text=text, relevance={})
+                    queries[query_id] = QueryRecord(
+                        query_id=query_id, 
+                        text=text, 
+                        relevance={},
+                        relevance_all={}
+                    )
+                
+                # Store all scores >= min_relevance_ndcg for NDCG
+                if relevance >= min_relevance_ndcg:
+                    queries[query_id].relevance_all[doc_id] = relevance
+                
+                # Store only scores >= min_relevance for Precision/Recall
                 if relevance >= min_relevance:
                     queries[query_id].relevance[doc_id] = relevance
     else:
@@ -195,7 +216,18 @@ def load_test_data(test_path: Path, min_relevance: float, queries_path: Path = N
                 doc_id = row["item_id"]
                 relevance = float(row.get("score", 0) or 0)
                 if query_id not in queries:
-                    queries[query_id] = QueryRecord(query_id=query_id, text=text, relevance={})
+                    queries[query_id] = QueryRecord(
+                        query_id=query_id, 
+                        text=text, 
+                        relevance={},
+                        relevance_all={}
+                    )
+                
+                # Store all scores >= min_relevance_ndcg for NDCG
+                if relevance >= min_relevance_ndcg:
+                    queries[query_id].relevance_all[doc_id] = relevance
+                
+                # Store only scores >= min_relevance for Precision/Recall
                 if relevance >= min_relevance:
                     queries[query_id].relevance[doc_id] = relevance
     
@@ -239,6 +271,7 @@ def evaluate(config_path: Path) -> None:
     max_k = max(ks)
     metrics_requested = set(eval_cfg.get("metrics", ["precision", "recall", "ndcg"]))
     min_rel = float(eval_cfg.get("min_relevance", 0.5))  # Support float for LLM scores (0-10 scale)
+    min_rel_ndcg = float(eval_cfg.get("min_relevance_ndcg", 0.0))  # Separate threshold for NDCG (default: include all including 0)
 
     test_path = Path(data_cfg["test_path"])
     if not test_path.exists():
@@ -251,16 +284,24 @@ def evaluate(config_path: Path) -> None:
         if not queries_path.exists():
             raise FileNotFoundError(f"Queries file not found: {queries_path}")
 
-    # Load evaluation data
-    query_records = load_test_data(test_path, min_rel, queries_path=queries_path)
+    # Load evaluation data with two thresholds
+    query_records = load_test_data(test_path, min_rel, min_rel_ndcg, queries_path=queries_path)
     if not query_records:
         raise ValueError("No queries with relevance >= min_relevance found in test data.")
 
-    # Initialise retriever
+    # Initialize retriever
     items_path = Path(retriever_cfg["items_path"])
     params = retriever_cfg.get("params", {})
+    retriever_type = retriever_cfg.get("type", "bm25")
     documents = load_food_candidates(items_path)
     retriever = BM25Retriever(documents, **params)
+    
+    # Store retriever configuration for output
+    retriever_config = {
+        "type": retriever_type,
+        "items_path": str(items_path),
+        "params": params
+    }
 
     # Perform retrieval for each query
     retrievals: List[RetrievalResult] = []
@@ -281,6 +322,7 @@ def evaluate(config_path: Path) -> None:
     per_query_rows: List[dict] = []
     aggregated: Dict[str, List[float]] = defaultdict(list)
     coverage_counts: Dict[int, int] = {k: 0 for k in ks}
+    retrieval_results: List[dict] = []
 
     for result in retrievals:
         qr = query_records[result.query_id]
@@ -290,8 +332,29 @@ def evaluate(config_path: Path) -> None:
         row = {
             "query_id": result.query_id,
             "query_text": qr.text,
+            "retriever_type": retriever_type,
+            "retriever_params": json.dumps(params),
             "latency_ms": result.latency_ms,
         }
+
+        # Store retrieval results for separate file
+        retrieval_result_entry = {
+            "query_id": result.query_id,
+            "query_text": qr.text,
+            "retriever_type": retriever_type,
+            "retriever_params": params,
+            "latency_ms": result.latency_ms,
+            "retrieved_items": [
+                {
+                    "item_id": doc.id,
+                    "item_name": doc.name,
+                    "rank": rank + 1,
+                    "bm25_score": float(score)
+                }
+                for rank, (doc, score) in enumerate(zip(result.retrieved, result.scores))
+            ]
+        }
+        retrieval_results.append(retrieval_result_entry)
 
         for k in ks:
             prefix = f"@{k}"
@@ -304,11 +367,14 @@ def evaluate(config_path: Path) -> None:
                 row[f"recall{prefix}"] = value
                 aggregated[f"recall{prefix}"].append(value)
             if "ndcg" in metrics_requested:
-                value = ndcg_at_k(doc_ids, qr.relevance, k)
+                # Use relevance_all (includes all scores >= min_relevance_ndcg, including 0)
+                value = ndcg_at_k(doc_ids, qr.relevance_all, k)
                 row[f"ndcg{prefix}"] = value
                 aggregated[f"ndcg{prefix}"].append(value)
-            if any(doc_id in qr.relevance for doc_id in doc_ids[:k]):
-                coverage_counts[k] += 1
+            if "coverage" in metrics_requested:
+                # Coverage: check if any relevant item (based on min_relevance) is in top-k
+                if any(doc_id in qr.relevance for doc_id in doc_ids[:k]):
+                    coverage_counts[k] += 1
 
         if "map" in metrics_requested:
             ap = average_precision(doc_ids, rel_ids)
@@ -328,7 +394,10 @@ def evaluate(config_path: Path) -> None:
     for key, values in aggregated.items():
         summary_metrics[key] = sum(values) / len(values)
 
-    coverage_summary = {f"coverage@{k}": coverage_counts[k] / len(retrievals) for k in ks}
+    # Calculate coverage metrics if requested
+    coverage_summary = {}
+    if "coverage" in metrics_requested:
+        coverage_summary = {f"coverage@{k}": coverage_counts[k] / len(retrievals) if retrievals else 0.0 for k in ks}
 
     timing_stats = {
         "query_count": len(retrievals),
@@ -343,18 +412,23 @@ def evaluate(config_path: Path) -> None:
 
     summary = {
         "config": deepcopy(config),
+        "retriever": retriever_config,
         "query_count": len(retrievals),
         "skipped_queries": skipped_queries,
         "metrics": summary_metrics,
-        "coverage": coverage_summary,
         "timing": timing_stats,
     }
+    
+    # Add coverage if requested
+    if "coverage" in metrics_requested:
+        summary["coverage"] = coverage_summary
 
     # Persist artifacts
     output_dir = ensure_output_dir(Path(output_cfg["dir"]), output_cfg.get("tag", "run"))
     save_json(output_dir / "metrics_summary.json", summary)
     save_csv(output_dir / "per_query_metrics.csv", per_query_rows)
     save_json(output_dir / "timing.json", timing_stats)
+    save_json(output_dir / "retrieval_results.json", retrieval_results)
 
     # Copy config for reproducibility
     with (output_dir / "config_used.toml").open("wb") as f:

@@ -18,8 +18,8 @@ def tokenize(text: str) -> List[str]:
     """
     Tokenize text by splitting on underscores and other delimiters.
     
-    This ensures that "not_vegan" is tokenized as ["not", "vegan"]
-    instead of ["not_vegan"], allowing queries like "not vegan" to match.
+    This ensures that "não_vegano" is tokenized as ["não", "vegano"]
+    instead of ["não_vegano"], allowing queries like "não vegano" to match.
     """
     # Replace underscores with spaces so they act as word separators
     text_normalized = text.replace("_", " ")
@@ -79,19 +79,19 @@ def build_candidate_text(metadata: dict) -> str:
         pieces.append(str(price))
 
     if metadata.get("lacFree") is True:
-        pieces.append("lactose_free")
+        pieces.append("sem_lactose")
     elif metadata.get("lacFree") is False:
-        pieces.append("not_lactose_free")
+        pieces.append("com_lactose")
 
     if metadata.get("organic") is True:
-        pieces.append("organic")
+        pieces.append("orgânico")
     elif metadata.get("organic") is False:
-        pieces.append("not_organic")
+        pieces.append("não_orgânico")
 
     if metadata.get("vegan") is True:
-        pieces.append("vegan")
+        pieces.append("vegano")
     elif metadata.get("vegan") is False:
-        pieces.append("not_vegan")
+        pieces.append("não_vegano")
 
     return " ".join(pieces)
 
