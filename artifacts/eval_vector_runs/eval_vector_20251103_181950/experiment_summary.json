@@ -1,0 +1,229 @@
+{
+  "experiment_name": "Experiment 2: Vector Embedding Model Comparison",
+  "timestamp": "2025-11-03T18:19:50.110448+00:00",
+  "dataset": {
+    "queries": "/Users/xianzhang/Documents/prosus/Food-Semantic-Search/data/test/10_queries.csv",
+    "items": "/Users/xianzhang/Documents/prosus/Food-Semantic-Search/data/test/500_items.csv",
+    "test_set": "/Users/xianzhang/Documents/prosus/Food-Semantic-Search/data/test/test_query_new.csv"
+  },
+  "metrics_evaluated": [
+    "precision@5",
+    "recall@5",
+    "ndcg@5",
+    "coverage@5",
+    "mrr",
+    "precision@10",
+    "recall@10",
+    "ndcg@10",
+    "coverage@10"
+  ],
+  "configurations": [
+    {
+      "model_name": "text-embedding-3-small",
+      "dimensions": 1536,
+      "normalize_embeddings": true
+    },
+    {
+      "model_name": "text-embedding-3-small",
+      "dimensions": 768,
+      "normalize_embeddings": true
+    },
+    {
+      "model_name": "text-embedding-3-large",
+      "dimensions": 3072,
+      "normalize_embeddings": true
+    },
+    {
+      "model_name": "text-embedding-3-large",
+      "dimensions": 1536,
+      "normalize_embeddings": true
+    },
+    {
+      "model_name": "text-embedding-3-large",
+      "dimensions": 768,
+      "normalize_embeddings": true
+    }
+  ],
+  "results": [
+    {
+      "config": {
+        "model_name": "text-embedding-3-small",
+        "dimensions": 1536,
+        "normalize_embeddings": true
+      },
+      "query_count": 10,
+      "metrics": {
+        "precision@5": 0.52,
+        "recall@5": 0.08062472262365653,
+        "ndcg@5": 0.35477321689355656,
+        "coverage@5": 0.9,
+        "precision@10": 0.5,
+        "recall@10": 0.14408742950650014,
+        "ndcg@10": 0.3567444958417454,
+        "coverage@10": 1.0,
+        "mrr": 0.9166666666666666
+      },
+      "latency": {
+        "avg_latency_ms": 398.8213459029794,
+        "median_latency_ms": 304.6772499801591,
+        "p95_latency_ms": 792.0597938238648,
+        "p99_latency_ms": 1014.2219587671572,
+        "min_latency_ms": 268.3217499870807,
+        "max_latency_ms": 1069.7625000029802
+      },
+      "cost": {
+        "total_requests": 15,
+        "total_input_tokens": 34871,
+        "avg_tokens_per_request": 2324.733333333333,
+        "max_tokens_per_request": 8162,
+        "min_tokens_per_request": 4,
+        "storage_size_bytes": 3133440,
+        "storage_size_mb": 2.98828125
+      }
+    },
+    {
+      "config": {
+        "model_name": "text-embedding-3-small",
+        "dimensions": 768,
+        "normalize_embeddings": true
+      },
+      "query_count": 10,
+      "metrics": {
+        "precision@5": 0.56,
+        "recall@5": 0.08396424024888843,
+        "ndcg@5": 0.39495160169646615,
+        "coverage@5": 0.9,
+        "precision@10": 0.47000000000000003,
+        "recall@10": 0.13340371572247905,
+        "ndcg@10": 0.3774386814874442,
+        "coverage@10": 0.9,
+        "mrr": 0.85
+      },
+      "latency": {
+        "avg_latency_ms": 411.1828291323036,
+        "median_latency_ms": 420.7502296194434,
+        "p95_latency_ms": 573.1395650072955,
+        "p99_latency_ms": 592.1229801955633,
+        "min_latency_ms": 273.52933306246996,
+        "max_latency_ms": 596.8688339926302
+      },
+      "cost": {
+        "total_requests": 15,
+        "total_input_tokens": 34871,
+        "avg_tokens_per_request": 2324.733333333333,
+        "max_tokens_per_request": 8162,
+        "min_tokens_per_request": 4,
+        "storage_size_bytes": 1566720,
+        "storage_size_mb": 1.494140625
+      }
+    },
+    {
+      "config": {
+        "model_name": "text-embedding-3-large",
+        "dimensions": 3072,
+        "normalize_embeddings": true
+      },
+      "query_count": 10,
+      "metrics": {
+        "precision@5": 0.7,
+        "recall@5": 0.12241693951041122,
+        "ndcg@5": 0.4060405633840122,
+        "coverage@5": 1.0,
+        "precision@10": 0.54,
+        "recall@10": 0.18171505269507904,
+        "ndcg@10": 0.40709126464436335,
+        "coverage@10": 1.0,
+        "mrr": 0.9
+      },
+      "latency": {
+        "avg_latency_ms": 404.97698329854757,
+        "median_latency_ms": 430.66568742506206,
+        "p95_latency_ms": 505.9319667518139,
+        "p99_latency_ms": 512.7414269000292,
+        "min_latency_ms": 263.2736670784652,
+        "max_latency_ms": 514.443791937083
+      },
+      "cost": {
+        "total_requests": 15,
+        "total_input_tokens": 34871,
+        "avg_tokens_per_request": 2324.733333333333,
+        "max_tokens_per_request": 8162,
+        "min_tokens_per_request": 4,
+        "storage_size_bytes": 6266880,
+        "storage_size_mb": 5.9765625
+      }
+    },
+    {
+      "config": {
+        "model_name": "text-embedding-3-large",
+        "dimensions": 1536,
+        "normalize_embeddings": true
+      },
+      "query_count": 10,
+      "metrics": {
+        "precision@5": 0.66,
+        "recall@5": 0.1231729981955744,
+        "ndcg@5": 0.3811434164257007,
+        "coverage@5": 1.0,
+        "precision@10": 0.53,
+        "recall@10": 0.18094603346124102,
+        "ndcg@10": 0.38934760595883605,
+        "coverage@10": 1.0,
+        "mrr": 0.95
+      },
+      "latency": {
+        "avg_latency_ms": 394.9597289552912,
+        "median_latency_ms": 387.15224992483854,
+        "p95_latency_ms": 626.4485312858596,
+        "p99_latency_ms": 639.4389062421396,
+        "min_latency_ms": 255.07704098708928,
+        "max_latency_ms": 642.6864999812096
+      },
+      "cost": {
+        "total_requests": 15,
+        "total_input_tokens": 34871,
+        "avg_tokens_per_request": 2324.733333333333,
+        "max_tokens_per_request": 8162,
+        "min_tokens_per_request": 4,
+        "storage_size_bytes": 3133440,
+        "storage_size_mb": 2.98828125
+      }
+    },
+    {
+      "config": {
+        "model_name": "text-embedding-3-large",
+        "dimensions": 768,
+        "normalize_embeddings": true
+      },
+      "query_count": 10,
+      "metrics": {
+        "precision@5": 0.56,
+        "recall@5": 0.09860521612779231,
+        "ndcg@5": 0.3407298300798179,
+        "coverage@5": 1.0,
+        "precision@10": 0.55,
+        "recall@10": 0.18468719708842624,
+        "ndcg@10": 0.38303288849471456,
+        "coverage@10": 1.0,
+        "mrr": 0.875
+      },
+      "latency": {
+        "avg_latency_ms": 331.2153749167919,
+        "median_latency_ms": 302.06693743821234,
+        "p95_latency_ms": 470.1051519368776,
+        "p99_latency_ms": 497.3097967565991,
+        "min_latency_ms": 258.1799170002341,
+        "max_latency_ms": 504.1109579615295
+      },
+      "cost": {
+        "total_requests": 15,
+        "total_input_tokens": 34871,
+        "avg_tokens_per_request": 2324.733333333333,
+        "max_tokens_per_request": 8162,
+        "min_tokens_per_request": 4,
+        "storage_size_bytes": 1566720,
+        "storage_size_mb": 1.494140625
+      }
+    }
+  ]
+}

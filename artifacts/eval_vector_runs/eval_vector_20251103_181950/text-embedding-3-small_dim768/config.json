@@ -1,0 +1,5 @@
+{
+  "model_name": "text-embedding-3-small",
+  "dimensions": 768,
+  "normalize_embeddings": true
+}

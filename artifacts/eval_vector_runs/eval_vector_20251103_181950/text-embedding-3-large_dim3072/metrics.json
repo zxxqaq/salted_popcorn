@@ -1,0 +1,30 @@
+{
+  "metrics": {
+    "precision@5": 0.7,
+    "recall@5": 0.12241693951041122,
+    "ndcg@5": 0.4060405633840122,
+    "coverage@5": 1.0,
+    "precision@10": 0.54,
+    "recall@10": 0.18171505269507904,
+    "ndcg@10": 0.40709126464436335,
+    "coverage@10": 1.0,
+    "mrr": 0.9
+  },
+  "latency": {
+    "avg_latency_ms": 404.97698329854757,
+    "median_latency_ms": 430.66568742506206,
+    "p95_latency_ms": 505.9319667518139,
+    "p99_latency_ms": 512.7414269000292,
+    "min_latency_ms": 263.2736670784652,
+    "max_latency_ms": 514.443791937083
+  },
+  "cost": {
+    "total_requests": 15,
+    "total_input_tokens": 34871,
+    "avg_tokens_per_request": 2324.733333333333,
+    "max_tokens_per_request": 8162,
+    "min_tokens_per_request": 4,
+    "storage_size_bytes": 6266880,
+    "storage_size_mb": 5.9765625
+  }
+}
