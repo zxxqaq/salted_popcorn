@@ -1,0 +1,662 @@
+[
+  {
+    "query_id": "59",
+    "query_text": "Nachos recheados supremos",
+    "retrieved_items": [
+      {
+        "item_id": "817a9de2-0340-4e02-af15-6242d4a09c41",
+        "item_name": "16. Cheddar + Bacon",
+        "rank": 1,
+        "score": 0.5628951105523555
+      },
+      {
+        "item_id": "bb80e77f-c18a-48f4-b094-f648dbc4ada4",
+        "item_name": "Chili Cheese Vegetariano (sem carne)",
+        "rank": 2,
+        "score": 0.5556112889359195
+      },
+      {
+        "item_id": "0d6f5b0e-d95d-47db-8f40-813cc44eb825",
+        "item_name": "Batata Coberta - Costela",
+        "rank": 3,
+        "score": 0.554442192885996
+      },
+      {
+        "item_id": "c0a5042f-9c3c-484b-977b-76ae53e8f536",
+        "item_name": "Recheadinho de frango na brasa - 800g",
+        "rank": 4,
+        "score": 0.5366599227836524
+      },
+      {
+        "item_id": "a1cd1e70-a468-4d73-9dbf-92da0a0250d1",
+        "item_name": "Combo Max Apimentado ( Batata Peq + Coca-Cola 350 ml )",
+        "rank": 5,
+        "score": 0.5348322676706008
+      },
+      {
+        "item_id": "1eeaf83f-965e-4483-84b9-550737f43b62",
+        "item_name": "Green Bacon",
+        "rank": 6,
+        "score": 0.5305402191304185
+      },
+      {
+        "item_id": "d22069ed-0380-43d5-bb6a-2fb5951240ab",
+        "item_name": "Bowl Frango Corn Bacon",
+        "rank": 7,
+        "score": 0.5273510834660455
+      },
+      {
+        "item_id": "209edf82-effb-477e-ba0f-4b7dfda6a697",
+        "item_name": "Salgadinho Crunchy Super Sabor Cheddar Cheetos 78g",
+        "rank": 8,
+        "score": 0.5244782452920768
+      },
+      {
+        "item_id": "e3b3b023-09b9-41ed-868b-0b3b76884280",
+        "item_name": "Lanche - Hot Dog Gratinado Premium ( serve 1 pessoa )",
+        "rank": 9,
+        "score": 0.5190529062816505
+      },
+      {
+        "item_id": "c245b922-925a-4059-a4fe-26b876ac8bdf",
+        "item_name": "Pastel de carne com requeijão e pimenta biquinho",
+        "rank": 10,
+        "score": 0.5185355239677312
+      }
+    ]
+  },
+  {
+    "query_id": "56",
+    "query_text": "Sanduíche de carne estilo delicatessen",
+    "retrieved_items": [
+      {
+        "item_id": "479a4625-100c-4a99-ac1c-a934f70e70cf",
+        "item_name": "113 - Espetacular (Prensado com Calabresa)",
+        "rank": 1,
+        "score": 0.5972931294126075
+      },
+      {
+        "item_id": "3702e6fe-72c1-436b-8385-91a523593008",
+        "item_name": "Hot dog especial",
+        "rank": 2,
+        "score": 0.5851443537012407
+      },
+      {
+        "item_id": "dcc1bfd5-35c2-42f6-bf7e-9e07a45d7e2a",
+        "item_name": "Balance",
+        "rank": 3,
+        "score": 0.5783957131130397
+      },
+      {
+        "item_id": "a440a5f1-caca-4e9c-9b27-bf035dc19475",
+        "item_name": "Combo Chicken Bacon",
+        "rank": 4,
+        "score": 0.57783519987222
+      },
+      {
+        "item_id": "59073373-6c6b-453c-9d1a-b9d3abf7a692",
+        "item_name": "X Salada Bacon N15",
+        "rank": 5,
+        "score": 0.5741798979743435
+      },
+      {
+        "item_id": "a8099d21-5563-40fe-895f-6e13cbb62b84",
+        "item_name": "Lanche São Domingos artesanal",
+        "rank": 6,
+        "score": 0.5741136621631392
+      },
+      {
+        "item_id": "e3b3b023-09b9-41ed-868b-0b3b76884280",
+        "item_name": "Lanche - Hot Dog Gratinado Premium ( serve 1 pessoa )",
+        "rank": 7,
+        "score": 0.5729013024170573
+      },
+      {
+        "item_id": "35dc426b-be44-4a05-8d9d-1f20cedc352a",
+        "item_name": "Trio Bacon Dog",
+        "rank": 8,
+        "score": 0.5701410569333702
+      },
+      {
+        "item_id": "405716f9-8804-40a7-b304-60483aee28f5",
+        "item_name": "Burguer",
+        "rank": 9,
+        "score": 0.562759959200875
+      },
+      {
+        "item_id": "78e857a2-1d2a-4807-828a-878035d6b77e",
+        "item_name": "Pastel de Carne com Queijo",
+        "rank": 10,
+        "score": 0.5598314983949693
+      }
+    ]
+  },
+  {
+    "query_id": "45",
+    "query_text": "Sanduíche estilo Nova Orleans",
+    "retrieved_items": [
+      {
+        "item_id": "1eeaf83f-965e-4483-84b9-550737f43b62",
+        "item_name": "Green Bacon",
+        "rank": 1,
+        "score": 0.5745843938623896
+      },
+      {
+        "item_id": "a440a5f1-caca-4e9c-9b27-bf035dc19475",
+        "item_name": "Combo Chicken Bacon",
+        "rank": 2,
+        "score": 0.5420392184620116
+      },
+      {
+        "item_id": "a8099d21-5563-40fe-895f-6e13cbb62b84",
+        "item_name": "Lanche São Domingos artesanal",
+        "rank": 3,
+        "score": 0.5300720125634464
+      },
+      {
+        "item_id": "35dc426b-be44-4a05-8d9d-1f20cedc352a",
+        "item_name": "Trio Bacon Dog",
+        "rank": 4,
+        "score": 0.5292982904174953
+      },
+      {
+        "item_id": "6610fdd9-0aaa-4fd4-bbc4-499724cb8b99",
+        "item_name": "Peninha",
+        "rank": 5,
+        "score": 0.5215102964976343
+      },
+      {
+        "item_id": "b777fc69-b9c9-4a2c-a7ba-5402c2e9ab51",
+        "item_name": "X-infarto",
+        "rank": 6,
+        "score": 0.5189805737870158
+      },
+      {
+        "item_id": "479a4625-100c-4a99-ac1c-a934f70e70cf",
+        "item_name": "113 - Espetacular (Prensado com Calabresa)",
+        "rank": 7,
+        "score": 0.5153590276298015
+      },
+      {
+        "item_id": "311b6d5c-44d1-4fbe-a653-2695036a0b0d",
+        "item_name": "X-Calabresa Turbinado",
+        "rank": 8,
+        "score": 0.5132598383444961
+      },
+      {
+        "item_id": "405716f9-8804-40a7-b304-60483aee28f5",
+        "item_name": "Burguer",
+        "rank": 9,
+        "score": 0.5098528631824965
+      },
+      {
+        "item_id": "eee59087-7374-408a-a364-217186eb200d",
+        "item_name": "Onion Rings Chicken",
+        "rank": 10,
+        "score": 0.5074998761518946
+      }
+    ]
+  },
+  {
+    "query_id": "39",
+    "query_text": "Café da manhã clássico",
+    "retrieved_items": [
+      {
+        "item_id": "f50e15c5-b670-409b-b312-ad58821089b8",
+        "item_name": "Media 700g omelete de frios, linguiça toscana, fritas e farofa, arroz, feijão",
+        "rank": 1,
+        "score": 0.49391040230127725
+      },
+      {
+        "item_id": "35dc426b-be44-4a05-8d9d-1f20cedc352a",
+        "item_name": "Trio Bacon Dog",
+        "rank": 2,
+        "score": 0.48884385270136377
+      },
+      {
+        "item_id": "817a9de2-0340-4e02-af15-6242d4a09c41",
+        "item_name": "16. Cheddar + Bacon",
+        "rank": 3,
+        "score": 0.4643633070193873
+      },
+      {
+        "item_id": "0816c4ce-7880-484b-9482-61d959c6234a",
+        "item_name": "Virada paulista G",
+        "rank": 4,
+        "score": 0.4629093126081222
+      },
+      {
+        "item_id": "59073373-6c6b-453c-9d1a-b9d3abf7a692",
+        "item_name": "X Salada Bacon N15",
+        "rank": 5,
+        "score": 0.4613404995823869
+      },
+      {
+        "item_id": "ccabea27-71e2-4a79-b8e0-671a069b9227",
+        "item_name": "Denver Bronco - Duplo Bacon",
+        "rank": 6,
+        "score": 0.46001713188219573
+      },
+      {
+        "item_id": "f3488073-c4fb-45df-9613-0f8edc30b971",
+        "item_name": "Pão francês (10 und)",
+        "rank": 7,
+        "score": 0.45998446134977233
+      },
+      {
+        "item_id": "a440a5f1-caca-4e9c-9b27-bf035dc19475",
+        "item_name": "Combo Chicken Bacon",
+        "rank": 8,
+        "score": 0.45996772751949655
+      },
+      {
+        "item_id": "0d76a840-f71f-4d1b-af95-2c87d88d3e0d",
+        "item_name": "Pão Integral Aveia e Sementes Clássicas Nutrella 350g",
+        "rank": 9,
+        "score": 0.45935469898073167
+      },
+      {
+        "item_id": "40ac84b8-c9ce-404c-b558-9523bb9ed961",
+        "item_name": "Torta Banoffe individual",
+        "rank": 10,
+        "score": 0.458572751851301
+      }
+    ]
+  },
+  {
+    "query_id": "16",
+    "query_text": "Monte seu próprio refogado",
+    "retrieved_items": [
+      {
+        "item_id": "c1042eb0-ed04-4ed1-98ff-de74932728df",
+        "item_name": "Yakisoba Misto - Carne e Frango",
+        "rank": 1,
+        "score": 0.5137064171652216
+      },
+      {
+        "item_id": "d22069ed-0380-43d5-bb6a-2fb5951240ab",
+        "item_name": "Bowl Frango Corn Bacon",
+        "rank": 2,
+        "score": 0.5084344812257969
+      },
+      {
+        "item_id": "d2ff747e-5178-419e-9698-437eaef31ce5",
+        "item_name": "Bife acebolado em tiras",
+        "rank": 3,
+        "score": 0.49427253438081464
+      },
+      {
+        "item_id": "f74fdf89-18a7-43bd-9166-4228755f6596",
+        "item_name": "Escolha seu Yakisoba  (1 pessoa)",
+        "rank": 4,
+        "score": 0.48911885432571245
+      },
+      {
+        "item_id": "e102dccb-8ac8-4a46-8bea-aa4e2f6fbfd5",
+        "item_name": "Frango Grelhado e Legumes",
+        "rank": 5,
+        "score": 0.4854740465664317
+      },
+      {
+        "item_id": "787b423f-3421-4763-8506-c59d3b84c3cd",
+        "item_name": "Marmita de Filé Mignon Suíno à Milanesa Pequena",
+        "rank": 6,
+        "score": 0.48295129533950626
+      },
+      {
+        "item_id": "7253be1c-94ba-4ca2-8a9a-3e03d8913abe",
+        "item_name": "Monte seu Acai",
+        "rank": 7,
+        "score": 0.4822960706111577
+      },
+      {
+        "item_id": "8384c47c-04e4-49f7-a890-d4fd0648bb26",
+        "item_name": "Bife acebolado P",
+        "rank": 8,
+        "score": 0.4794916347335039
+      },
+      {
+        "item_id": "21871e57-e543-4268-95db-98080bf00204",
+        "item_name": "Isca de frango com pimentao e cebola",
+        "rank": 9,
+        "score": 0.47828073580355907
+      },
+      {
+        "item_id": "28d20dcc-a66b-4f8a-b527-a7c1f8875861",
+        "item_name": "Carne de panela com batata soute",
+        "rank": 10,
+        "score": 0.4728727288360912
+      }
+    ]
+  },
+  {
+    "query_id": "51",
+    "query_text": "Prato de frutos do mar costeiros",
+    "retrieved_items": [
+      {
+        "item_id": "b536d3ab-57fb-4b04-bd36-e4418ab388e7",
+        "item_name": "Super Peixe Escabeche",
+        "rank": 1,
+        "score": 0.5178955310284763
+      },
+      {
+        "item_id": "4ffb5c6f-0be4-4ca0-ba2a-fa77a2fb61e7",
+        "item_name": "Massa Alfredo com Camarões",
+        "rank": 2,
+        "score": 0.5012577895309495
+      },
+      {
+        "item_id": "6c0527ec-cacc-43c1-9ae3-599c7f91ddac",
+        "item_name": "Sashimi crispy",
+        "rank": 3,
+        "score": 0.477665146357783
+      },
+      {
+        "item_id": "744a4e56-aaa3-44ae-9c4e-6fcd579cac4b",
+        "item_name": "Cotoletta Parmigiana",
+        "rank": 4,
+        "score": 0.4773818665856331
+      },
+      {
+        "item_id": "368af208-1051-424d-be2e-de4cde8dc91d",
+        "item_name": "Sashimi de Salmão Maçaricado Trufado (8 fatias)",
+        "rank": 5,
+        "score": 0.4750582849698439
+      },
+      {
+        "item_id": "e46e6c51-6c79-4060-8e83-79baa5f7adec",
+        "item_name": "Parmegiana de Frango",
+        "rank": 6,
+        "score": 0.4736684349743112
+      },
+      {
+        "item_id": "21871e57-e543-4268-95db-98080bf00204",
+        "item_name": "Isca de frango com pimentao e cebola",
+        "rank": 7,
+        "score": 0.47176334965502964
+      },
+      {
+        "item_id": "e102dccb-8ac8-4a46-8bea-aa4e2f6fbfd5",
+        "item_name": "Frango Grelhado e Legumes",
+        "rank": 8,
+        "score": 0.46963313831209313
+      },
+      {
+        "item_id": "4f98ca0b-3d8e-41d5-b1d9-18b5b47e3b72",
+        "item_name": "Espaguete Valentina",
+        "rank": 9,
+        "score": 0.46242583718620556
+      },
+      {
+        "item_id": "cd16b4d5-4a8c-429e-802b-7c0ea9d23f33",
+        "item_name": "Combo poke salmão fresco mais Del Valle",
+        "rank": 10,
+        "score": 0.4611515882175802
+      }
+    ]
+  },
+  {
+    "query_id": "36",
+    "query_text": "Burrito de café da manhã recheado",
+    "retrieved_items": [
+      {
+        "item_id": "af7ce4fe-f32f-485d-86a4-0efa38cdac57",
+        "item_name": "Marmitex 2 - Omelete (presunto e queijo)",
+        "rank": 1,
+        "score": 0.49067898027157164
+      },
+      {
+        "item_id": "f50e15c5-b670-409b-b312-ad58821089b8",
+        "item_name": "Media 700g omelete de frios, linguiça toscana, fritas e farofa, arroz, feijão",
+        "rank": 2,
+        "score": 0.48751824020151524
+      },
+      {
+        "item_id": "d22069ed-0380-43d5-bb6a-2fb5951240ab",
+        "item_name": "Bowl Frango Corn Bacon",
+        "rank": 3,
+        "score": 0.47416054223575194
+      },
+      {
+        "item_id": "311b6d5c-44d1-4fbe-a653-2695036a0b0d",
+        "item_name": "X-Calabresa Turbinado",
+        "rank": 4,
+        "score": 0.4684558189575925
+      },
+      {
+        "item_id": "2242aea4-18c2-4c66-b366-a03b07e7cc9a",
+        "item_name": "Frango",
+        "rank": 5,
+        "score": 0.46783881374710234
+      },
+      {
+        "item_id": "80bd94e8-bb8e-4f1b-8ad0-3944e79a4322",
+        "item_name": "Crepioca Completa",
+        "rank": 6,
+        "score": 0.45586872809160955
+      },
+      {
+        "item_id": "c245b922-925a-4059-a4fe-26b876ac8bdf",
+        "item_name": "Pastel de carne com requeijão e pimenta biquinho",
+        "rank": 7,
+        "score": 0.4528652247302857
+      },
+      {
+        "item_id": "494ca946-0f4a-43e1-8215-dab72aa4ac8d",
+        "item_name": "Enrolado De Frango C/Requeijao Assado",
+        "rank": 8,
+        "score": 0.4506092920515853
+      },
+      {
+        "item_id": "91a72cb5-0480-4e9b-9e55-cae1ff86e93e",
+        "item_name": "Bolo de Pote Ninho com Morango",
+        "rank": 9,
+        "score": 0.4426573737461614
+      },
+      {
+        "item_id": "c0a5042f-9c3c-484b-977b-76ae53e8f536",
+        "item_name": "Recheadinho de frango na brasa - 800g",
+        "rank": 10,
+        "score": 0.4411746264857489
+      }
+    ]
+  },
+  {
+    "query_id": "9",
+    "query_text": "Lancheira estilo bento",
+    "retrieved_items": [
+      {
+        "item_id": "787b423f-3421-4763-8506-c59d3b84c3cd",
+        "item_name": "Marmita de Filé Mignon Suíno à Milanesa Pequena",
+        "rank": 1,
+        "score": 0.5193482289513859
+      },
+      {
+        "item_id": "a8099d21-5563-40fe-895f-6e13cbb62b84",
+        "item_name": "Lanche São Domingos artesanal",
+        "rank": 2,
+        "score": 0.48755689550194903
+      },
+      {
+        "item_id": "f2385e8f-25d0-45cb-bf1a-2c17f7fed6bc",
+        "item_name": "Lanche n 23",
+        "rank": 3,
+        "score": 0.4872298391173173
+      },
+      {
+        "item_id": "bb73bd61-5c12-48ca-a23e-2f1ce81770ab",
+        "item_name": "Combo Familia 4 x salada l+ calabresa+fritas+refri 2 lts",
+        "rank": 4,
+        "score": 0.4863668964141416
+      },
+      {
+        "item_id": "21871e57-e543-4268-95db-98080bf00204",
+        "item_name": "Isca de frango com pimentao e cebola",
+        "rank": 5,
+        "score": 0.4841424133087583
+      },
+      {
+        "item_id": "6610fdd9-0aaa-4fd4-bbc4-499724cb8b99",
+        "item_name": "Peninha",
+        "rank": 6,
+        "score": 0.4836016397451469
+      },
+      {
+        "item_id": "b433688a-1231-4e82-af98-5bae7a9b192a",
+        "item_name": "Cascão baunilha",
+        "rank": 7,
+        "score": 0.48352026057678843
+      },
+      {
+        "item_id": "d22069ed-0380-43d5-bb6a-2fb5951240ab",
+        "item_name": "Bowl Frango Corn Bacon",
+        "rank": 8,
+        "score": 0.4799319377760995
+      },
+      {
+        "item_id": "b6097c88-5fc3-4fe4-8b7c-558933f8a912",
+        "item_name": "Combo Chutoro",
+        "rank": 9,
+        "score": 0.4796911258072375
+      },
+      {
+        "item_id": "35dc426b-be44-4a05-8d9d-1f20cedc352a",
+        "item_name": "Trio Bacon Dog",
+        "rank": 10,
+        "score": 0.4776794405338117
+      }
+    ]
+  },
+  {
+    "query_id": "48",
+    "query_text": "Petiscos gourmet",
+    "retrieved_items": [
+      {
+        "item_id": "a8b477a0-0524-4d71-82e8-c7a3a01327e1",
+        "item_name": "20 Mini Pasteis +1 Refrigerante Lata",
+        "rank": 1,
+        "score": 0.5708100057078257
+      },
+      {
+        "item_id": "53b176d0-96e2-4fcc-9aa4-171c2d5e662d",
+        "item_name": "Pet Petiscos para Gatos Natural Crisp 20g",
+        "rank": 2,
+        "score": 0.5523666345752458
+      },
+      {
+        "item_id": "0d89fdd3-57b2-4798-8c70-a237b04394c8",
+        "item_name": "Espetinho Pão de alho",
+        "rank": 3,
+        "score": 0.5452142546261818
+      },
+      {
+        "item_id": "40ac84b8-c9ce-404c-b558-9523bb9ed961",
+        "item_name": "Torta Banoffe individual",
+        "rank": 4,
+        "score": 0.5420676212423032
+      },
+      {
+        "item_id": "90854d01-9fc5-45e0-8a8c-47712146cba7",
+        "item_name": "Amendoim Crocante Cebola e Salsa Pettiz Dori 120g",
+        "rank": 5,
+        "score": 0.5386748177306682
+      },
+      {
+        "item_id": "cbf09df9-b971-46a6-8d60-fd619d7bbf26",
+        "item_name": "Geladinho Gourmet de Ninho com morango",
+        "rank": 6,
+        "score": 0.5353686648253764
+      },
+      {
+        "item_id": "17d46a03-ce32-45ab-8e02-c50bcead2288",
+        "item_name": "Batata Palito Pequena",
+        "rank": 7,
+        "score": 0.5339496242482478
+      },
+      {
+        "item_id": "4f505c13-d676-443e-b257-a4795d244a31",
+        "item_name": "2 Brigadeiros (50g cada um)",
+        "rank": 8,
+        "score": 0.5266794723834118
+      },
+      {
+        "item_id": "e3b3b023-09b9-41ed-868b-0b3b76884280",
+        "item_name": "Lanche - Hot Dog Gratinado Premium ( serve 1 pessoa )",
+        "rank": 9,
+        "score": 0.5265953747648184
+      },
+      {
+        "item_id": "53661db2-a519-4ef2-ac45-a3c4a08c3948",
+        "item_name": "Petisco Sheba Cremoso Sabor Atum Gatos Adultos 4 Uni",
+        "rank": 10,
+        "score": 0.525182415353512
+      }
+    ]
+  },
+  {
+    "query_id": "98",
+    "query_text": "Caixa de proteína rápida e saudável",
+    "retrieved_items": [
+      {
+        "item_id": "68725855-84fa-4ef6-a0e2-86206a5d16bb",
+        "item_name": "Requeijão Cremoso Light Oba Bem Querer 200g",
+        "rank": 1,
+        "score": 0.5163288111859833
+      },
+      {
+        "item_id": "bf57debc-fc10-4c83-96bd-bd97bfc90909",
+        "item_name": "Ração Úmida Pedigree Sachê High Proteína Cães Adultos Porco E Carne Ao Molho 85gr",
+        "rank": 2,
+        "score": 0.5118211686695389
+      },
+      {
+        "item_id": "c4093e8e-9549-4b30-a413-704bd8c6fb59",
+        "item_name": "Açaí Bowl Comfy Chia Pudding (350ml)",
+        "rank": 3,
+        "score": 0.502823205328649
+      },
+      {
+        "item_id": "4ad1c0d7-2764-4347-9626-d30ff47af3f6",
+        "item_name": "Açaí copo 500ml",
+        "rank": 4,
+        "score": 0.4966509958694712
+      },
+      {
+        "item_id": "b433688a-1231-4e82-af98-5bae7a9b192a",
+        "item_name": "Cascão baunilha",
+        "rank": 5,
+        "score": 0.49380108494151
+      },
+      {
+        "item_id": "77f4da47-828a-46a4-a48d-ed7a431207ff",
+        "item_name": "Suco Pronto Uva e Maçã Natural One 900ml",
+        "rank": 6,
+        "score": 0.4902306013565263
+      },
+      {
+        "item_id": "e3818489-9818-48a0-8c25-946bd8451607",
+        "item_name": "Biscoito Banana Aveia e Canela Nesfit 160g",
+        "rank": 7,
+        "score": 0.4894722710760078
+      },
+      {
+        "item_id": "78389502-cd3f-435a-9e3b-411b1f86b68b",
+        "item_name": "Requeijão Cremoso Light Natural da Vaca 200g",
+        "rank": 8,
+        "score": 0.4875786537763095
+      },
+      {
+        "item_id": "cd16b4d5-4a8c-429e-802b-7c0ea9d23f33",
+        "item_name": "Combo poke salmão fresco mais Del Valle",
+        "rank": 9,
+        "score": 0.48730739613261476
+      },
+      {
+        "item_id": "2cfe9fa3-0d7e-46eb-96ef-a4dfbf74384f",
+        "item_name": "Açaí 500ml+3 adicionais 1,00+2 frutas+1 creme opcional",
+        "rank": 10,
+        "score": 0.48718036804809317
+      }
+    ]
+  }
+]
