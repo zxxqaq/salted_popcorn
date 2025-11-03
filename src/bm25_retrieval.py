@@ -18,8 +18,13 @@ def tokenize(text: str) -> List[str]:
     """
     Tokenize text by splitting on underscores and other delimiters.
     
-    This ensures that "não_vegano" is tokenized as ["não", "vegano"]
-    instead of ["não_vegano"], allowing queries like "não vegano" to match.
+    Replaces underscores with spaces so they act as word separators.
+    This ensures that if any text contains underscores (e.g., "não_vegano"),
+    it will be tokenized as ["não", "vegano"] instead of ["não_vegano"],
+    allowing queries like "não vegano" to match.
+    
+    Note: build_candidate_text() now generates text with spaces instead of underscores,
+    so this function primarily handles edge cases or other text sources that may contain underscores.
     """
     # Replace underscores with spaces so they act as word separators
     text_normalized = text.replace("_", " ")
@@ -79,19 +84,19 @@ def build_candidate_text(metadata: dict) -> str:
         pieces.append(str(price))
 
     if metadata.get("lacFree") is True:
-        pieces.append("sem_lactose")
+        pieces.append("sem lactose")
     elif metadata.get("lacFree") is False:
-        pieces.append("com_lactose")
+        pieces.append("com lactose")
 
     if metadata.get("organic") is True:
         pieces.append("orgânico")
     elif metadata.get("organic") is False:
-        pieces.append("não_orgânico")
+        pieces.append("não orgânico")
 
     if metadata.get("vegan") is True:
         pieces.append("vegano")
     elif metadata.get("vegan") is False:
-        pieces.append("não_vegano")
+        pieces.append("não vegano")
 
     return " ".join(pieces)
 

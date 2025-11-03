@@ -1,0 +1,33 @@
+[retriever]
+type = "vector"
+items_path = "data/test/500_items.csv"
+
+# Option 1: Local model (SentenceTransformer)
+# params.model_name = "paraphrase-multilingual-MiniLM-L12-v2"
+# params.device = null  # null = auto, or "cuda" / "cpu"
+# params.normalize_embeddings = true
+
+# Option 2: OpenAI API (uncomment and configure)
+params.api_base = "https://pd67dqn1bd.execute-api.eu-west-1.amazonaws.com"  # Your LiteLLM proxy URL
+params.api_key = "your-api-key-here"  # Replace with your actual API key
+params.model_name = "text-embedding-3-small"  # or "text-embedding-3-large"
+params.max_tokens_per_request = 8192  # Max total tokens per API request (each text max 8192 tokens)
+# params.max_items_per_batch = null  # Optional: Max items per request. Only useful if texts are very short (< 50 tokens each). Set to null to disable (default: only token limit applies)
+params.rpm_limit = 300  # Requests per minute limit (0 = no limit)
+params.normalize_embeddings = true  # Normalize embeddings for cosine similarity
+params.timeout = 120.0  # Request timeout in seconds
+
+[data]
+test_path = "data/test/test_query.csv"
+queries_path = "data/test/10_queries.csv"
+
+[evaluation]
+ks = [5, 10]
+metrics = ["precision", "recall", "ndcg", "mrr", "coverage"]
+min_relevance = 1.0  # Only consider scores >= 1.0 as relevant for Precision/Recall/MRR (on 0-10 scale)
+min_relevance_ndcg = 0.0  # Include all scores (including 0) for NDCG calculation
+
+[output]
+dir = "artifacts/eval_runs"
+tag = "vector_with_llm_scores"
+

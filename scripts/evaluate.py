@@ -33,6 +33,7 @@ if str(REPO_ROOT) not in sys.path:
     sys.path.insert(0, str(REPO_ROOT))
 
 from src.bm25_retrieval import BM25Retriever, Candidates, load_food_candidates
+from src.vector_retrieval import VectorRetriever
 
 
 # ---------------------------------------------------------------------------
@@ -289,12 +290,25 @@ def evaluate(config_path: Path) -> None:
     if not query_records:
         raise ValueError("No queries with relevance >= min_relevance found in test data.")
 
-    # Initialize retriever
+    # Initialize retriever based on type
     items_path = Path(retriever_cfg["items_path"])
     params = retriever_cfg.get("params", {})
     retriever_type = retriever_cfg.get("type", "bm25")
     documents = load_food_candidates(items_path)
-    retriever = BM25Retriever(documents, **params)
+    
+    if retriever_type == "bm25":
+        retriever = BM25Retriever(documents, **params)
+    elif retriever_type == "vector":
+        # Convert None strings to actual None for optional parameters
+        params_processed = {}
+        for key, value in params.items():
+            if value == "null" or value is None:
+                params_processed[key] = None
+            else:
+                params_processed[key] = value
+        retriever = VectorRetriever(documents, **params_processed)
+    else:
+        raise ValueError(f"Unknown retriever type: {retriever_type}. Supported types: 'bm25', 'vector'")
     
     # Store retriever configuration for output
     retriever_config = {
