@@ -1,7 +1,7 @@
 """Evaluation pipeline for recall quality and latency metrics.
 
 Usage:
-    python scripts/evaluate.py --config configs/eval.toml
+    python3 scripts/evaluate.py --config configs/eval.toml
 
 Outputs per run are stored in an artifacts directory defined in the
 configuration. The script computes classical information retrieval metrics

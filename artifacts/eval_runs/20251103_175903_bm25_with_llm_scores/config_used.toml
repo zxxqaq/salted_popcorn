@@ -16,5 +16,5 @@ min_relevance_ndcg = 0.0  # Include all scores (including 0) for NDCG calculatio
 
 [output]
 dir = "artifacts/eval_runs"
-tag = "bm25"
+tag = "bm25_with_llm_scores"
 
