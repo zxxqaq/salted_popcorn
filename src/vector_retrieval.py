@@ -2,12 +2,21 @@ from __future__ import annotations
 
 import csv
 import json
+import os
 import time
 from dataclasses import dataclass
 from pathlib import Path
 from typing import Iterator, List, Sequence, Tuple
 
 import numpy as np
+
+# Load environment variables from .env file if available
+try:
+    from dotenv import load_dotenv
+    load_dotenv()
+except ImportError:
+    # dotenv is optional, continue without it
+    pass
 
 try:
     import requests
@@ -222,6 +231,7 @@ def call_embedding_api(
     rpm_limit: int = 0,
     sleep_between_requests: float = 0.0,
     use_openai_library: bool = True,
+    dimensions: int | None = None,
 ) -> List[List[float]]:
     """
     Call OpenAI Embedding API to get embeddings for a batch of texts.
@@ -237,6 +247,9 @@ def call_embedding_api(
         rpm_limit: Requests per minute limit (0 = no limit)
         sleep_between_requests: Sleep time between requests in seconds
         use_openai_library: If True, use openai library; if False, use requests directly
+        dimensions: Optional number of dimensions for output embeddings.
+            Only supported in text-embedding-3 and later models.
+            If None, uses model's default dimensions.
         
     Returns:
         List of embedding vectors (each is a list of floats)
@@ -257,10 +270,16 @@ def call_embedding_api(
                 timeout=timeout,
             )
             
-            response = client.embeddings.create(
-                model=model,
-                input=texts,
-            )
+            # Build parameters for embeddings.create
+            create_params = {
+                "model": model,
+                "input": texts,
+            }
+            # Add dimensions only if specified and supported (text-embedding-3+)
+            if dimensions is not None:
+                create_params["dimensions"] = dimensions
+            
+            response = client.embeddings.create(**create_params)
             
             embeddings = [item.embedding for item in response.data]
             return embeddings
@@ -291,6 +310,9 @@ def call_embedding_api(
         "model": model,
         "input": texts,
     }
+    # Add dimensions only if specified and supported (text-embedding-3+)
+    if dimensions is not None:
+        payload["dimensions"] = dimensions
     
     # Standard OpenAI API format - use Authorization: Bearer header
     headers = {
@@ -347,10 +369,11 @@ class VectorRetriever:
         # OpenAI API parameters
         api_base: str | None = None,
         api_key: str | None = None,
-        max_tokens_per_request: int = 8000000,  # Max total tokens per API request
+        max_tokens_per_request: int = 8192,  # Max total tokens per API request
         max_items_per_batch: int | None = None,  # Optional: Max items per request (only for very short texts)
-        rpm_limit: int = 0,  # Requests per minute limit (0 = no limit)
+        rpm_limit: int = 300,  # Requests per minute limit (0 = no limit)
         timeout: float = 120.0,
+        dimensions: int | None = None,  # Optional: Output dimensions (text-embedding-3+ only)
     ) -> None:
         """
         Initialize vector retriever.
@@ -369,14 +392,23 @@ class VectorRetriever:
                 are very short. If None, only token limit is used. Default None.
             rpm_limit: Requests per minute limit (auto-calculates sleep if set)
             timeout: Request timeout in seconds
+            dimensions: Optional number of dimensions for output embeddings.
+                Only supported in text-embedding-3 and later models.
+                If None, uses model's default dimensions.
         """
         self.candidates = list(candidates)
-        self.use_api = api_base is not None
+        
+        # Determine if using API: either api_base is provided, or api_key is provided (use standard OpenAI API)
+        self.use_api = api_base is not None or (api_key is not None and api_key)
         
         if self.use_api:
             # OpenAI API mode
             if not api_key:
                 raise ValueError("api_key is required when using OpenAI API")
+            
+            # If api_base is None but api_key is provided, use standard OpenAI API
+            if api_base is None:
+                api_base = "https://api.openai.com/v1"
             
             self.api_base = api_base
             self.api_key = api_key
@@ -384,6 +416,7 @@ class VectorRetriever:
             self.max_tokens_per_request = max_tokens_per_request
             self.max_items_per_batch = max_items_per_batch
             self.timeout = timeout
+            self.dimensions = dimensions
             
             # Calculate sleep time based on RPM limit
             if rpm_limit > 0:
@@ -402,6 +435,10 @@ class VectorRetriever:
                 print(f"  Max items per request: {max_items_per_batch}")
             else:
                 print(f"  Max items per request: unlimited (only token limit)")
+            if dimensions is not None:
+                print(f"  Dimensions: {dimensions}")
+            else:
+                print(f"  Dimensions: default (model-dependent)")
             
             # Get batch info
             batch_info = get_batch_info(texts, max_tokens_per_request)
@@ -431,6 +468,7 @@ class VectorRetriever:
                         timeout=self.timeout,
                         rpm_limit=rpm_limit,
                         sleep_between_requests=self.sleep_between_requests,
+                        dimensions=self.dimensions,
                     )
                     all_embeddings.extend(batch_embeddings)
                 except Exception as e:
@@ -493,6 +531,7 @@ class VectorRetriever:
                 timeout=self.timeout,
                 rpm_limit=0,  # Don't sleep for single query
                 sleep_between_requests=0.0,
+                dimensions=self.dimensions,
             )
             query_embedding = np.array(query_embeddings[0])
             
@@ -546,6 +585,7 @@ def demonstrate_sample_query(
     use_openai_api: bool = False,
     api_base: str | None = None,
     api_key: str | None = None,
+    dimensions: int | None = None,
 ) -> None:
     """
     Demonstrate vector retrieval with a sample query.
@@ -555,6 +595,9 @@ def demonstrate_sample_query(
         use_openai_api: If True, use OpenAI API; if False, use local SentenceTransformer model
         api_base: API base URL (required if use_openai_api=True)
         api_key: API key (required if use_openai_api=True)
+        dimensions: Optional number of dimensions for output embeddings.
+            Only supported in text-embedding-3 and later models.
+            If None, uses model's default dimensions.
     """
     items_path = data_dir / "500_items.csv"
     queries_path = data_dir / "10_queries.csv"
@@ -575,6 +618,10 @@ def demonstrate_sample_query(
             print(f"  Using custom API: {api_base}")
         
         print(f"  Model: text-embedding-3-small")
+        if dimensions is not None:
+            print(f"  Dimensions: {dimensions}")
+        else:
+            print(f"  Dimensions: default (model-dependent)")
         # text-embedding-3-small supports up to 8191 tokens per input
         # For batch requests, use a conservative limit
         retriever = VectorRetriever(
@@ -585,6 +632,7 @@ def demonstrate_sample_query(
             max_tokens_per_request=8192,  # Conservative limit for batch processing
             max_items_per_batch=100,  # Limit items per batch to avoid server issues
             rpm_limit=500,  # OpenAI default is higher, but use conservative limit
+            dimensions=dimensions,  # Pass dimensions parameter
         )
     else:
         print("  Using local SentenceTransformer model")
@@ -608,15 +656,47 @@ def demonstrate_sample_query(
 
 
 if __name__ == "__main__":
-    import os
-    
     project_root = Path(__file__).resolve().parents[1]
     
-    # Use standard OpenAI API (no custom api_base)
+    # Get API key from .env file or environment variable
+    api_key = os.getenv("OPENAI_API_KEY")
+    
+    if not api_key:
+        print("=" * 70)
+        print("ERROR: OPENAI_API_KEY not found!")
+        print("=" * 70)
+        print("Please set your OpenAI API key in one of the following ways:")
+        print("\n1. Create a .env file in the project root with:")
+        print("   OPENAI_API_KEY=sk-your-key-here")
+        print("\n2. Or set environment variable:")
+        print("   export OPENAI_API_KEY='sk-your-key-here'")
+        print("\n3. Install python-dotenv if you want to use .env file:")
+        print("   pip install python-dotenv")
+        print("=" * 70)
+        exit(1)
+    
+    # Get optional API base from .env file or environment variable
+    api_base = os.getenv("OPENAI_API_BASE")
+    if api_base and api_base.strip():
+        api_base = api_base.strip()
+    else:
+        api_base = None  # None means use standard OpenAI API
+    
+    # Get optional dimensions from .env file or environment variable
+    dimensions_str = os.getenv("OPENAI_EMBEDDING_DIMENSIONS")
+    dimensions = None
+    if dimensions_str and dimensions_str.strip():
+        try:
+            dimensions = int(dimensions_str.strip())
+        except ValueError:
+            print(f"Warning: Invalid OPENAI_EMBEDDING_DIMENSIONS value '{dimensions_str}', ignoring.")
+    
+    # Use standard OpenAI API
     demonstrate_sample_query(
         project_root / "data" / "test",
         use_openai_api=True,
-        api_base=None,  # None means use standard OpenAI API
-        api_key="",
+        api_base=api_base,  # None means use standard OpenAI API
+        api_key=api_key,
+        dimensions=dimensions,  # Pass dimensions if specified
     )
 

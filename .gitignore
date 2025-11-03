@@ -6,4 +6,6 @@
 
 docs
 
-scripts/score_with_llm.py
+# Environment variables
+.env
+
