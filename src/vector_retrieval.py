@@ -439,6 +439,14 @@ class VectorRetriever:
         self.query_model = None  # Will be initialized lazily if needed
         self.doc_model = None  # Will be initialized lazily if needed for local model
         
+        # Pre-load query model if using local model for queries (to avoid delay on first query)
+        if self.query_embedding_model and SENTENCE_TRANSFORMERS_AVAILABLE:
+            print(f"Loading query embedding model: {self.query_embedding_model}")
+            model_load_start = time.time()
+            self.query_model = SentenceTransformer(self.query_embedding_model)
+            model_load_time = time.time() - model_load_start
+            print(f"✓ Query embedding model loaded in {model_load_time:.2f}s")
+        
         # Determine index path: handle both file path and directory path
         if index_path is None:
             # Default: use artifacts/vector_indices directory
@@ -845,8 +853,9 @@ class VectorRetriever:
                     "Install with: pip install sentence-transformers"
                 )
             
-            # Lazy initialization of query model
+            # Query model should already be loaded in __init__, but check just in case
             if self.query_model is None:
+                # Fallback: lazy initialization if somehow not loaded
                 print(f"  Loading local query embedding model: {self.query_embedding_model}")
                 query_embedding_start = time.time()
                 self.query_model = SentenceTransformer(self.query_embedding_model)

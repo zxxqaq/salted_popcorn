@@ -128,30 +128,6 @@ def main():
     candidates = load_food_candidates_for_hybrid(items_path)
     print(f"  ✓ Loaded {len(candidates)} items")
     
-    # Get API keys from environment (loaded from .env file or system environment)
-    vector_api_key = os.getenv("VECTOR_API_KEY") or os.getenv("OPENAI_API_KEY")
-    if not vector_api_key:
-        print("\n" + "=" * 80)
-        print("ERROR: VECTOR_API_KEY or OPENAI_API_KEY not found!")
-        print("=" * 80)
-        print("Please set your OpenAI API key in one of the following ways:")
-        print("\n1. Create a .env file in the project root with:")
-        print("   OPENAI_API_KEY=sk-your-key-here")
-        print(f"\n   Expected location: {env_path}")
-        print("\n2. Or set environment variable:")
-        print("   export OPENAI_API_KEY='sk-your-key-here'")
-        print("\n3. Install python-dotenv if you want to use .env file:")
-        print("   pip install python-dotenv")
-        print("=" * 80)
-        return
-    
-    vector_api_base = os.getenv("VECTOR_API_BASE", "https://api.openai.com/v1")
-    if vector_api_base.strip() == "":
-        vector_api_base = "https://api.openai.com/v1"
-    
-    print(f"  ✓ Vector API key loaded (from .env or environment)")
-    print(f"  ✓ Vector API base: {vector_api_base}")
-    
     # Get all required parameters from environment variables
     print("\nLoading configuration from environment variables...")
     
@@ -181,6 +157,8 @@ def main():
     vector_local_model_name = os.getenv("VECTOR_LOCAL_MODEL_NAME")
     if vector_local_model_name:
         vector_local_model_name = vector_local_model_name.strip()
+        if not vector_local_model_name:
+            vector_local_model_name = None
     else:
         vector_local_model_name = None
     
@@ -188,22 +166,44 @@ def main():
     vector_api_base = os.getenv("VECTOR_API_BASE")
     if vector_api_base:
         vector_api_base = vector_api_base.strip()
+        if not vector_api_base:
+            vector_api_base = None
     else:
         vector_api_base = None
     
     vector_api_key = os.getenv("VECTOR_API_KEY") or os.getenv("OPENAI_API_KEY")
     if vector_api_key:
         vector_api_key = vector_api_key.strip()
+        if not vector_api_key:
+            vector_api_key = None
     else:
         vector_api_key = None
     
     # Validate: must have either local model or API config
     if not vector_local_model_name and not vector_api_key:
-        raise ValueError(
-            "Either VECTOR_LOCAL_MODEL_NAME or VECTOR_API_KEY must be set in .env file.\n"
-            "For local model: VECTOR_LOCAL_MODEL_NAME=sentence-transformers/paraphrase-multilingual-MiniLM-L12-v2\n"
-            "For API: VECTOR_API_KEY=sk-..."
-        )
+        print("\n" + "=" * 80)
+        print("ERROR: Missing vector retrieval configuration!")
+        print("=" * 80)
+        print("Please set one of the following in your .env file:")
+        print("\n1. For local model (recommended, no API key needed):")
+        print("   VECTOR_LOCAL_MODEL_NAME=sentence-transformers/paraphrase-multilingual-MiniLM-L12-v2")
+        print("\n2. For API (requires API key):")
+        print("   VECTOR_API_KEY=sk-your-key-here")
+        print(f"\n   Expected .env location: {env_path}")
+        print("=" * 80)
+        return
+    
+    # Show which mode is being used
+    if vector_local_model_name:
+        print(f"  ✓ Using local model: {vector_local_model_name}")
+        print(f"  ✓ No API key required (using local embeddings)")
+    else:
+        print(f"  ✓ Using API mode")
+        print(f"  ✓ API key loaded (from .env or environment)")
+        if vector_api_base:
+            print(f"  ✓ API base: {vector_api_base}")
+        else:
+            print(f"  ✓ API base: https://api.openai.com/v1 (default)")
     
     # API parameters (only used if using API)
     vector_model_name = os.getenv("VECTOR_MODEL_NAME")
@@ -447,40 +447,40 @@ def main():
         # BM25 parameters (required)
         bm25_k1=bm25_k1,
         bm25_b=bm25_b,
-        # Vector retrieval parameters (choose one: local model or API)
-        vector_api_base=vector_api_base,  # Optional, only if using API
-        vector_api_key=vector_api_key,  # Optional, only if using API
-        vector_model_name=vector_model_name,  # Optional, only if using API
-        vector_dimensions=vector_dimensions,  # Optional, only if using API
-        vector_max_tokens_per_request=vector_max_tokens_per_request,  # Optional, only if using API
-        vector_max_items_per_batch=vector_max_items_per_batch,  # Optional, only if using API
-        vector_rpm_limit=vector_rpm_limit,  # Optional, only if using API
-        vector_timeout=vector_timeout,  # Optional, only if using API
-        vector_local_model_name=vector_local_model_name,  # Optional, if using local model
-        vector_normalize_embeddings=vector_normalize_embeddings,
+        # Required parameters (no defaults)
         vector_hnsw_index_path=vector_hnsw_index_path,
+        retrieval_top_k=retrieval_top_k,
+        use_rrf=use_rrf,
+        rrf_k=rrf_k,
+        rrf_top_k=rrf_top_k,
+        final_top_k_1=final_top_k_1,
+        final_top_k_2=final_top_k_2,
+        reranker_model=reranker_model,
+        # Optional parameters (with defaults)
+        # API parameters (optional, only if using API)
+        vector_api_base=vector_api_base,
+        vector_api_key=vector_api_key,
+        vector_model_name=vector_model_name,
+        vector_dimensions=vector_dimensions,
+        vector_max_tokens_per_request=vector_max_tokens_per_request,
+        vector_max_items_per_batch=vector_max_items_per_batch,
+        vector_rpm_limit=vector_rpm_limit,
+        vector_timeout=vector_timeout,
+        # Local model parameters (optional, if using local model)
+        vector_local_model_name=vector_local_model_name,
+        vector_normalize_embeddings=vector_normalize_embeddings,
         vector_use_hnsw=vector_use_hnsw,
         vector_hnsw_m=vector_hnsw_m,
         vector_hnsw_ef_construction=vector_hnsw_ef_construction,
         vector_hnsw_ef_search=vector_hnsw_ef_search,
         vector_embeddings_dir=vector_embeddings_dir,
         vector_cache_embeddings=vector_cache_embeddings,
-        # Retrieval parameters (required)
-        retrieval_top_k=retrieval_top_k,
-        # RRF fusion parameters (required)
-        use_rrf=use_rrf,
-        rrf_k=rrf_k,
-        rrf_top_k=rrf_top_k,
-        # Final output parameters (required)
-        final_top_k_1=final_top_k_1,
-        final_top_k_2=final_top_k_2,
-        # Cross-Encoder re-ranking parameters (required)
-        reranker_model=reranker_model,
+        # Cross-Encoder re-ranking optional parameters
         reranker_device=reranker_device,
         reranker_batch_size=reranker_batch_size,
-        reranker_top_k=reranker_top_k,  # Optional: None = score all items, or set to return top-K
+        reranker_top_k=reranker_top_k,
         # Query embedding parameters (optional)
-        vector_query_embedding_model=vector_query_embedding_model,  # Optional: local model for query embeddings
+        vector_query_embedding_model=vector_query_embedding_model,
     )
     print("  ✓ Hybrid retriever initialized")
     
@@ -624,6 +624,20 @@ def main():
         avg_score_top_k1 = sum(score for _, score in result.top_5) / len(result.top_5)
         print(f"  Average Cross-Encoder Score (Top-{final_top_k_1}): {avg_score_top_k1:.4f}")
     
+    # Timing information
+    print("\n" + "=" * 80)
+    print("TIMING BREAKDOWN")
+    print("=" * 80)
+    print(f"  BM25 Retrieval:        {result.bm25_time:.3f}s")
+    print(f"  Vector Retrieval:      {result.vector_time:.3f}s")
+    if use_rrf:
+        print(f"  RRF Fusion:            {result.rrf_time:.3f}s")
+    else:
+        print(f"  Merge & Deduplicate:   {result.rrf_time:.3f}s")
+    print(f"  Cross-Encoder Re-rank: {result.rerank_time:.3f}s")
+    print("-" * 80)
+    print(f"  TOTAL TIME:            {result.total_time:.3f}s")
+    print("=" * 80)
     print("\n" + "=" * 80)
     print("Demo completed!")
     print("=" * 80)

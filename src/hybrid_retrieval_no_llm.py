@@ -58,6 +58,12 @@ class HybridRetrievalResult:
     bm25_results: List[Tuple[Candidates, float]]  # Original BM25 results (top-50)
     vector_results: List[Tuple[Candidates, float]]  # Original vector results (top-50)
     merged_items: List[Candidates]  # Merged items before Cross-Encoder re-ranking
+    # Timing information (in seconds)
+    bm25_time: float = 0.0
+    vector_time: float = 0.0
+    rrf_time: float = 0.0  # or merge_time if not using RRF
+    rerank_time: float = 0.0
+    total_time: float = 0.0
 
 
 class HybridRetriever:
@@ -72,6 +78,20 @@ class HybridRetriever:
         bm25_k1: float,
         bm25_b: float,
         # Vector retrieval parameters (choose one: API or local model)
+        # Required parameters (no defaults)
+        vector_hnsw_index_path: Path | str,  # Required: path to existing HNSW index file
+        # Retrieval parameters (required)
+        retrieval_top_k: int,  # Top-K for each retrieval method (default: 50)
+        # RRF fusion parameters (required)
+        use_rrf: bool,  # Whether to use RRF fusion before Cross-Encoder re-ranking
+        rrf_k: int,  # RRF constant k (typically 60)
+        rrf_top_k: int,  # Top-K results after RRF fusion (input to Cross-Encoder)
+        # Final output parameters (required)
+        final_top_k_1: int,  # First top-K result set (e.g., top-5)
+        final_top_k_2: int,  # Second top-K result set (e.g., top-10)
+        # Cross-Encoder re-ranking parameters (required)
+        reranker_model: str,  # Model name for Cross-Encoder reranker (e.g., "BAAI/bge-reranker-base")
+        # Optional parameters (with defaults)
         # API parameters (optional, if using API)
         vector_api_base: str | None = None,
         vector_api_key: str | None = None,
@@ -84,24 +104,13 @@ class HybridRetriever:
         # Local model parameters (optional, if using local model)
         vector_local_model_name: str | None = None,  # Local SentenceTransformer model (e.g., "sentence-transformers/paraphrase-multilingual-MiniLM-L12-v2")
         vector_normalize_embeddings: bool = True,
-        vector_hnsw_index_path: Path | str,  # Required: path to existing HNSW index file
         vector_use_hnsw: bool = True,
         vector_hnsw_m: int = 32,
         vector_hnsw_ef_construction: int = 100,
         vector_hnsw_ef_search: int = 64,
         vector_embeddings_dir: Path | str | None = None,
         vector_cache_embeddings: bool = True,
-        # Retrieval parameters (required)
-        retrieval_top_k: int,  # Top-K for each retrieval method (default: 50)
-        # RRF fusion parameters (required)
-        use_rrf: bool,  # Whether to use RRF fusion before Cross-Encoder re-ranking
-        rrf_k: int,  # RRF constant k (typically 60)
-        rrf_top_k: int,  # Top-K results after RRF fusion (input to Cross-Encoder)
-        # Final output parameters (required)
-        final_top_k_1: int,  # First top-K result set (e.g., top-5)
-        final_top_k_2: int,  # Second top-K result set (e.g., top-10)
-        # Cross-Encoder re-ranking parameters (required)
-        reranker_model: str,  # Model name for Cross-Encoder reranker (e.g., "BAAI/bge-reranker-base")
+        # Cross-Encoder re-ranking optional parameters
         reranker_device: str | None = None,  # Device to use ("mps", "cuda", "cpu", or None for auto)
         reranker_batch_size: int = 32,  # Batch size for Cross-Encoder (32 or 64 recommended for Mac MPS)
         reranker_top_k: int | None = None,  # Top-K items to return from reranker (None = return all scored items)
@@ -374,18 +383,20 @@ class HybridRetriever:
         Returns:
             HybridRetrievalResult with configurable top-K results (top_5 and top_10 fields)
         """
+        query_id = query_id or "unknown"
+        total_start = time.time()
+        
         if not query.strip():
             return HybridRetrievalResult(
-                query_id=query_id or "",
+                query_id=query_id,
                 query_text=query,
                 top_5=[],  # Empty top_k_1
                 top_10=[],  # Empty top_k_2
                 bm25_results=[],
                 vector_results=[],
                 merged_items=[],
+                total_time=time.time() - total_start,
             )
-        
-        query_id = query_id or "unknown"
         
         # Step 1: BM25 retrieval (top-50)
         LOGGER.info("Query %s: BM25 retrieval (top-%d)", query_id, self.retrieval_top_k)
@@ -417,6 +428,8 @@ class HybridRetriever:
         LOGGER.info("Query %s: Vector retrieved %d results in %.2fs", query_id, len(vector_results), vector_time)
         
         # Step 3: Merge and deduplicate (if not using RRF) or RRF fusion (if using RRF)
+        rrf_time = 0.0
+        merge_time = 0.0
         if self.use_rrf:
             LOGGER.info("Query %s: RRF fusion (k=%d, top-%d)", query_id, self.rrf_k, self.rrf_top_k)
             rrf_start = time.time()
@@ -439,6 +452,7 @@ class HybridRetriever:
         
         if not items_for_reranking:
             LOGGER.warning("Query %s: No items to re-rank", query_id)
+            total_time = time.time() - total_start
             return HybridRetrievalResult(
                 query_id=query_id,
                 query_text=query,
@@ -447,6 +461,10 @@ class HybridRetriever:
                 bm25_results=bm25_results,
                 vector_results=vector_results,
                 merged_items=[],  # Empty when no items to re-rank
+                bm25_time=bm25_time,
+                vector_time=vector_time,
+                rrf_time=rrf_time if self.use_rrf else merge_time,
+                total_time=total_time,
             )
         
         # Step 4: Cross-Encoder re-ranking (50 → top-10)
@@ -517,6 +535,8 @@ class HybridRetriever:
             self.final_top_k_2, score_range_2[0], score_range_2[1],
         )
         
+        total_time = time.time() - total_start
+        
         return HybridRetrievalResult(
             query_id=query_id,
             query_text=query,
@@ -525,6 +545,11 @@ class HybridRetriever:
             bm25_results=bm25_results,
             vector_results=vector_results,
             merged_items=items_for_reranking,  # Store items before Cross-Encoder re-ranking
+            bm25_time=bm25_time,
+            vector_time=vector_time,
+            rrf_time=rrf_time if self.use_rrf else merge_time,
+            rerank_time=rerank_time,
+            total_time=total_time,
         )
 
 
