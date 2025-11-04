@@ -727,9 +727,26 @@ Return JSON array with EXACTLY {len(items)} items:
                         "  LLM may have skipped some items or output is more compact than expected."
                     )
         
+        # Clean message: remove markdown code blocks if present
+        cleaned_message = message.strip()
+        
+        # Remove markdown code blocks (```json ... ``` or ``` ... ```)
+        if cleaned_message.startswith("```"):
+            # Find the first newline after ```
+            first_newline = cleaned_message.find("\n")
+            if first_newline > 0:
+                cleaned_message = cleaned_message[first_newline + 1:]
+            else:
+                # No newline, remove the first ```
+                cleaned_message = cleaned_message[3:]
+        
+        # Remove trailing ```
+        if cleaned_message.endswith("```"):
+            cleaned_message = cleaned_message[:-3].strip()
+        
         # Parse JSON response with better error handling
         try:
-            scores = json.loads(message.strip())
+            scores = json.loads(cleaned_message)
         except json.JSONDecodeError as exc:
             # Try to extract partial results if JSON is truncated or malformed
             LOGGER.warning("Failed to parse LLM response as complete JSON: %s", str(exc))
@@ -739,13 +756,13 @@ Return JSON array with EXACTLY {len(items)} items:
                 LOGGER.info("LLM response (last 500 chars): %s", message[-500:])
             
             # Try to extract partial JSON (if response was truncated)
-            if message.strip().startswith("[") and not message.strip().endswith("]"):
+            if cleaned_message.startswith("[") and not cleaned_message.endswith("]"):
                 # Response seems truncated, try to fix it
                 try:
                     # Try to find the last complete JSON object
-                    last_complete = message.rfind("}")
+                    last_complete = cleaned_message.rfind("}")
                     if last_complete > 0:
-                        partial_json = message[:last_complete + 1] + "]"
+                        partial_json = cleaned_message[:last_complete + 1] + "]"
                         scores = json.loads(partial_json)
                         LOGGER.warning(
                             "Extracted partial JSON results: %d items (expected %d)",
@@ -756,10 +773,10 @@ Return JSON array with EXACTLY {len(items)} items:
                 except (json.JSONDecodeError, ValueError) as e:
                     LOGGER.error("Failed to extract partial JSON: %s", str(e))
                     # Try to extract individual items from malformed JSON
-                    scores = self._extract_items_from_malformed_json(message, items)
+                    scores = self._extract_items_from_malformed_json(cleaned_message, items)
             else:
                 # Try to extract items from completely malformed JSON
-                scores = self._extract_items_from_malformed_json(message, items)
+                scores = self._extract_items_from_malformed_json(cleaned_message, items)
         
         # Validate that we got scores for all items
         if not isinstance(scores, list):
