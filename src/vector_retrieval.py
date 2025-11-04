@@ -742,6 +742,7 @@ class VectorRetriever:
         # Encode query
         if self.use_api:
             # Use API for query embedding
+            query_embedding_start = time.time()
             query_embeddings = call_embedding_api(
                 texts=[query],
                 api_base=self.api_base,
@@ -752,6 +753,8 @@ class VectorRetriever:
                 sleep_between_requests=0.0,
                 dimensions=self.dimensions,
             )
+            query_embedding_time = time.time() - query_embedding_start
+            print(f"  Query embedding API call completed in {query_embedding_time:.2f}s")
             query_embedding = np.array(query_embeddings[0])
             
             # Normalize if requested
@@ -775,7 +778,10 @@ class VectorRetriever:
                     query_vec = query_vec / norm
             
             # Search using HNSW
+            hnsw_search_start = time.time()
             labels, distances = self.hnsw_index.knn_query(query_vec, k=top_k)
+            hnsw_search_time = time.time() - hnsw_search_start
+            print(f"  HNSW search completed in {hnsw_search_time:.3f}s")
             
             # Convert distances to similarity scores
             # For cosine similarity: distance = 1 - similarity, so similarity = 1 - distance

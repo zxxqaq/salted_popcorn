@@ -358,40 +358,78 @@ class HybridRetriever:
         else:
             items_list = "(no items)"
         
-        prompt = f"""You are a ranking assistant for food search.
-
-Score each candidate item for the user query on an integer scale 0-10.
+        prompt = f"""You are a ranking assistant for food search. Score each candidate item for relevance to the user query.
 
 Query: {query}
 
-Candidates:
+Candidates (total: {len(items)} items):
 {items_list}
 
-Scoring guidelines:
-- 10: Perfectly matches the query
-- 8-9: Highly relevant, clear connection
-- 6-7: Somewhat relevant, partial match
-- 4-5: Marginally relevant, weak connection
-- 2-3: Barely relevant, minimal connection
-- 0-1: Completely unrelated
+Scoring (integer 0-10):
+- 10: Perfect match
+- 8-9: Highly relevant
+- 6-7: Somewhat relevant
+- 4-5: Marginally relevant
+- 2-3: Barely relevant
+- 0-1: Unrelated
 
-Important:
-- Use the full range of scores. Don't be too strict.
-- Consider intermediate scores (2-7) for items with partial relevance.
-- Only assign 0 for completely unrelated items.
-- Assign higher scores to items that clearly match the query intent.
+Guidelines:
+- Use the FULL range (0-10). Don't cluster scores.
+- Items with ANY connection should get 2+.
+- Only use 0-1 for completely unrelated items.
+- Distribute scores across the range.
 
-Return a JSON array of objects, each with "item_id" and "score" (integer 0-10).
-Example format:
+CRITICAL REQUIREMENTS:
+1. You MUST return a JSON array with EXACTLY {len(items)} items.
+2. Each item in the candidates list above MUST appear exactly once in your response.
+3. Do NOT skip any items. Do NOT stop early.
+4. Each item must have "item_id" and "score" fields.
+5. Count your output items to ensure you have {len(items)} items before finishing.
+
+Return ONLY a valid JSON array in this exact format:
 [
   {{"item_id": "item_001", "score": 8}},
   {{"item_id": "item_002", "score": 6}},
   ...
+  {{"item_id": "item_{len(items):03d}", "score": X}}
 ]
 
-Return ONLY the JSON array, no other text."""
+Return ONLY the JSON array, no other text. Ensure you have exactly {len(items)} items."""
         
         return prompt
+    
+    def _extract_items_from_malformed_json(self, message: str, items: Sequence[Candidates]) -> List[Dict[str, float]]:
+        """
+        Try to extract item scores from malformed JSON response.
+        
+        This is a fallback method that uses regex to find item_id and score pairs
+        even if the JSON is malformed.
+        """
+        import re
+        scores = []
+        item_ids = {item.id for item in items}
+        
+        # Try to find patterns like {"item_id": "...", "score": X} or {"item_id":"...","score":X}
+        pattern = r'\{"item_id"\s*:\s*"([^"]+)"\s*,\s*"score"\s*:\s*(\d+(?:\.\d+)?)\}'
+        matches = re.findall(pattern, message)
+        
+        for item_id, score_str in matches:
+            if item_id in item_ids:
+                try:
+                    score = float(score_str)
+                    scores.append({"item_id": item_id, "score": score})
+                except ValueError:
+                    continue
+        
+        if scores:
+            LOGGER.warning(
+                "Extracted %d item scores from malformed JSON using regex (expected %d)",
+                len(scores), len(items)
+            )
+        else:
+            LOGGER.error("Could not extract any item scores from malformed JSON response")
+        
+        return scores
     
     def _estimate_tokens(self, text: str) -> int:
         """Estimate token count for a text string."""
@@ -526,15 +564,27 @@ Return ONLY the JSON array, no other text."""
         
         # Calculate max_tokens based on number of items
         # Each item output: {"item_id": "...", "score": X} ≈ 50-70 tokens
-        # Add buffer for JSON array format and potential variations
-        estimated_response_tokens = len(items) * self.llm_tokens_per_item_output + 200  # Buffer for JSON array format
-        max_tokens = max(1000, estimated_response_tokens)
+        # Add significantly larger buffer for JSON array format and potential variations
+        # For large batches (50 items), we need much more buffer to avoid truncation
+        # Note: LLM may stop early even if max_tokens is sufficient, so we use a very large buffer
+        base_buffer = 1000  # Base buffer for JSON array format and structure (increased from 500)
+        item_buffer_multiplier = 2.5  # Extra buffer multiplier for safety (increased from 2.0)
+        estimated_response_tokens = int(len(items) * self.llm_tokens_per_item_output * item_buffer_multiplier + base_buffer)
+        max_tokens = max(4000, estimated_response_tokens)  # Minimum increased from 2000 to 4000
         
         # Ensure we don't exceed context window (but allow up to reasonable limit)
         # The actual prompt + output should not exceed context window
         prompt_tokens = self._estimate_tokens(prompt)
-        max_output_tokens = self.llm_max_context_tokens - prompt_tokens - 1000  # Safety margin
+        # Use larger safety margin for large prompts to ensure enough output space
+        safety_margin = max(2000, int(prompt_tokens * 0.1))  # At least 2000, or 10% of prompt
+        max_output_tokens = self.llm_max_context_tokens - prompt_tokens - safety_margin
         max_tokens = min(max_tokens, max_output_tokens)
+        
+        # Log the calculation for debugging
+        LOGGER.info(
+            "Token calculation: prompt=%d, available_output=%d, estimated_needed=%d, final_max_tokens=%d",
+            prompt_tokens, max_output_tokens, estimated_response_tokens, max_tokens
+        )
         
         if max_tokens < 100:
             LOGGER.warning(
@@ -565,7 +615,7 @@ Return ONLY the JSON array, no other text."""
         }
         
         prompt_tokens = self._estimate_tokens(prompt)
-        LOGGER.debug(
+        LOGGER.info(
             "LLM batch request: %d items, prompt_tokens≈%d, max_tokens=%d",
             len(items), prompt_tokens, max_tokens
         )
@@ -574,7 +624,10 @@ Return ONLY the JSON array, no other text."""
         LOGGER.debug("LLM API URL: %s", url)
         LOGGER.debug("LLM API Base: %s", self.llm_api_base)
         
+        # Time the API call
+        start_time = time.time()
         response = requests.post(url, headers=headers, json=payload, timeout=self.llm_timeout)
+        api_call_time = time.time() - start_time
         
         if response.status_code != 200:
             error_msg = (
@@ -588,11 +641,104 @@ Return ONLY the JSON array, no other text."""
         data = response.json()
         message = data.get("choices", [{}])[0].get("message", {}).get("content", "")
         
-        # Parse JSON response
+        # Log response details for debugging incomplete responses
+        if len(message) < 1000:
+            LOGGER.debug("LLM response (full): %s", message)
+        else:
+            LOGGER.debug("LLM response length: %d chars", len(message))
+            LOGGER.debug("LLM response (first 1000 chars): %s", message[:1000])
+            LOGGER.debug("LLM response (last 1000 chars): %s", message[-1000:])
+        
+        # Extract token usage from response (if available)
+        usage = data.get("usage", {})
+        prompt_tokens_actual = usage.get("prompt_tokens", prompt_tokens)
+        completion_tokens_actual = usage.get("completion_tokens", 0)
+        total_tokens_actual = usage.get("total_tokens", prompt_tokens_actual + completion_tokens_actual)
+        
+        # Log token usage and timing
+        LOGGER.info(
+            "LLM API call completed in %.2fs. Tokens: prompt=%d, completion=%d, total=%d, max_tokens=%d",
+            api_call_time, prompt_tokens_actual, completion_tokens_actual, total_tokens_actual, max_tokens
+        )
+        
+        # Check if output was truncated or incomplete
+        if completion_tokens_actual > 0:
+            truncation_ratio = completion_tokens_actual / max_tokens
+            if truncation_ratio > 0.9:
+                LOGGER.warning(
+                    "LLM output may be truncated: completion_tokens (%d) is %.1f%% of max_tokens (%d)",
+                    completion_tokens_actual, truncation_ratio * 100, max_tokens
+                )
+            # Check if output seems incomplete based on expected tokens
+            expected_tokens = len(items) * self.llm_tokens_per_item_output
+            completion_ratio = completion_tokens_actual / expected_tokens if expected_tokens > 0 else 0
+            if completion_ratio < 0.8:
+                LOGGER.warning(
+                    "LLM output appears incomplete: completion_tokens (%d) is %.1f%% of expected (~%d) for %d items",
+                    completion_tokens_actual, completion_ratio * 100, expected_tokens, len(items)
+                )
+                if completion_ratio < 0.7:
+                    LOGGER.warning(
+                        "  This suggests the response may be truncated or LLM skipped items. Consider increasing max_tokens."
+                    )
+                else:
+                    LOGGER.warning(
+                        "  LLM may have skipped some items or output is more compact than expected."
+                    )
+        
+        # Parse JSON response with better error handling
         try:
             scores = json.loads(message.strip())
         except json.JSONDecodeError as exc:
-            raise ValueError(f"Failed to parse LLM response as JSON: {message}") from exc
+            # Try to extract partial results if JSON is truncated or malformed
+            LOGGER.warning("Failed to parse LLM response as complete JSON: %s", str(exc))
+            LOGGER.info("LLM response length: %d chars", len(message))
+            LOGGER.info("LLM response (first 500 chars): %s", message[:500])
+            if len(message) > 500:
+                LOGGER.info("LLM response (last 500 chars): %s", message[-500:])
+            
+            # Try to extract partial JSON (if response was truncated)
+            if message.strip().startswith("[") and not message.strip().endswith("]"):
+                # Response seems truncated, try to fix it
+                try:
+                    # Try to find the last complete JSON object
+                    last_complete = message.rfind("}")
+                    if last_complete > 0:
+                        partial_json = message[:last_complete + 1] + "]"
+                        scores = json.loads(partial_json)
+                        LOGGER.warning(
+                            "Extracted partial JSON results: %d items (expected %d)",
+                            len(scores), len(items)
+                        )
+                    else:
+                        raise ValueError("Cannot extract partial JSON from truncated response")
+                except (json.JSONDecodeError, ValueError) as e:
+                    LOGGER.error("Failed to extract partial JSON: %s", str(e))
+                    # Try to extract individual items from malformed JSON
+                    scores = self._extract_items_from_malformed_json(message, items)
+            else:
+                # Try to extract items from completely malformed JSON
+                scores = self._extract_items_from_malformed_json(message, items)
+        
+        # Validate that we got scores for all items
+        if not isinstance(scores, list):
+            LOGGER.error("LLM response is not a list: %s", type(scores))
+            scores = []
+        
+        returned_item_ids = {score_dict.get("item_id", "") for score_dict in scores if isinstance(score_dict, dict) and score_dict.get("item_id")}
+        expected_item_ids = {item.id for item in items}
+        missing_in_response = expected_item_ids - returned_item_ids
+        
+        if missing_in_response:
+            missing_percentage = len(missing_in_response) / len(items) * 100 if items else 0
+            LOGGER.warning(
+                "LLM response missing %d/%d items (%.1f%%). Returned: %d, Expected: %d",
+                len(missing_in_response), len(items), missing_percentage, len(returned_item_ids), len(expected_item_ids)
+            )
+            if len(missing_in_response) <= 10:
+                LOGGER.warning("Missing items: %s", list(missing_in_response))
+            else:
+                LOGGER.warning("First 10 missing items: %s", list(missing_in_response)[:10])
         
         # Sleep if needed
         if self.llm_sleep > 0:
@@ -622,26 +768,33 @@ Return ONLY the JSON array, no other text."""
             return []
         
         # Batch items based on token limits
+        batching_start = time.time()
         batches = self._batch_items_by_tokens(query, items)
+        batching_time = time.time() - batching_start
         
         if len(batches) == 1:
             # Single batch, no need for batching
-            LOGGER.debug("Single batch: %d items", len(items))
+            LOGGER.info("Single batch: %d items (batching took %.2fs)", len(items), batching_time)
             return self._call_llm_for_single_batch(query, items)
         
         # Process multiple batches
-        LOGGER.info("Processing %d items in %d batches", len(items), len(batches))
+        LOGGER.info("Processing %d items in %d batches (batching took %.2fs)", len(items), len(batches), batching_time)
         all_scores: List[Dict[str, float]] = []
         
         for batch_idx, batch in enumerate(batches, 1):
-            LOGGER.debug("Processing batch %d/%d: %d items", batch_idx, len(batches), len(batch))
+            batch_start = time.time()
+            LOGGER.info("Processing batch %d/%d: %d items", batch_idx, len(batches), len(batch))
             try:
                 batch_scores = self._call_llm_for_single_batch(query, batch)
+                batch_time = time.time() - batch_start
+                LOGGER.info("Batch %d/%d completed in %.2fs: %d scores returned", batch_idx, len(batches), batch_time, len(batch_scores))
                 all_scores.extend(batch_scores)
             except Exception as exc:
-                LOGGER.error("Batch %d/%d failed: %s", batch_idx, len(batches), exc)
+                batch_time = time.time() - batch_start
+                LOGGER.error("Batch %d/%d failed after %.2fs: %s", batch_idx, len(batches), batch_time, exc)
                 raise
         
+        LOGGER.info("All %d batches completed. Total scores: %d (expected %d)", len(batches), len(all_scores), len(items))
         return all_scores
     
     def search(
@@ -674,13 +827,32 @@ Return ONLY the JSON array, no other text."""
         
         # Step 1: BM25 retrieval (top-50)
         LOGGER.info("Query %s: BM25 retrieval (top-%d)", query_id, self.retrieval_top_k)
+        bm25_start = time.time()
         bm25_results = self.bm25_retriever.search(query, top_k=self.retrieval_top_k)
-        LOGGER.debug("Query %s: BM25 retrieved %d results", query_id, len(bm25_results))
+        bm25_time = time.time() - bm25_start
+        LOGGER.info("Query %s: BM25 retrieved %d results in %.2fs", query_id, len(bm25_results), bm25_time)
+        
+        if len(bm25_results) < self.retrieval_top_k:
+            LOGGER.warning(
+                "Query %s: BM25 only returned %d results (requested %d). This may indicate:",
+                query_id, len(bm25_results), self.retrieval_top_k
+            )
+            LOGGER.warning(
+                "  - Low matching score threshold (all results below threshold)"
+            )
+            LOGGER.warning(
+                "  - Query terms not matching document vocabulary"
+            )
+            LOGGER.warning(
+                "  - Tokenization issues (especially for non-English queries)"
+            )
         
         # Step 2: Vector retrieval (top-50)
         LOGGER.info("Query %s: Vector retrieval (top-%d)", query_id, self.retrieval_top_k)
+        vector_start = time.time()
         vector_results = self.vector_retriever.search(query, top_k=self.retrieval_top_k)
-        LOGGER.debug("Query %s: Vector retrieved %d results", query_id, len(vector_results))
+        vector_time = time.time() - vector_start
+        LOGGER.info("Query %s: Vector retrieved %d results in %.2fs", query_id, len(vector_results), vector_time)
         
         # Step 3: Merge and deduplicate (if not using RRF) or RRF fusion (if using RRF)
         if self.use_rrf:
@@ -708,10 +880,14 @@ Return ONLY the JSON array, no other text."""
         
         # Step 4: LLM re-scoring and re-ranking
         LOGGER.info("Query %s: LLM re-ranking %d items", query_id, len(items_for_llm))
+        llm_start = time.time()
         try:
             llm_scores = self._call_llm_for_reranking(query, items_for_llm)
+            llm_time = time.time() - llm_start
+            LOGGER.info("Query %s: LLM re-ranking completed in %.2fs", query_id, llm_time)
         except Exception as exc:
-            LOGGER.error("Query %s: LLM re-ranking failed: %s", query_id, exc)
+            llm_time = time.time() - llm_start
+            LOGGER.error("Query %s: LLM re-ranking failed after %.2fs: %s", query_id, llm_time, exc)
             raise
         
         # Create a mapping from item_id to score
@@ -730,9 +906,22 @@ Return ONLY the JSON array, no other text."""
         # Check for missing scores
         missing_scores = [item.id for item in items_for_llm if item.id not in score_map]
         if missing_scores:
+            missing_percentage = len(missing_scores) / len(items_for_llm) * 100 if items_for_llm else 0
             LOGGER.warning(
-                "Query %s: Missing LLM scores for %d items: %s",
-                query_id, len(missing_scores), missing_scores[:5]
+                "Query %s: Missing LLM scores for %d/%d items (%.1f%%). This may indicate:",
+                query_id, len(missing_scores), len(items_for_llm), missing_percentage
+            )
+            LOGGER.warning(
+                "  - LLM output was truncated (max_tokens too small)"
+            )
+            LOGGER.warning(
+                "  - LLM skipped some items in response"
+            )
+            LOGGER.warning(
+                "  - JSON parsing failed for some items"
+            )
+            LOGGER.warning(
+                "  First 5 missing items: %s", missing_scores[:5]
             )
         
         # Create list of (candidate, score) tuples and sort by score

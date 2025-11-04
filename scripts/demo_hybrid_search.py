@@ -38,6 +38,15 @@ except ImportError:
     # dotenv is optional, continue without it
     pass
 
+import logging
+
+# Configure logging to show INFO level messages
+logging.basicConfig(
+    level=logging.INFO,
+    format='%(message)s',
+    handlers=[logging.StreamHandler()]
+)
+
 from src.hybrid_retrieval import HybridRetriever, load_food_candidates_for_hybrid
 
 
