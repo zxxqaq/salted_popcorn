@@ -23,6 +23,13 @@ except ImportError:
     )
 
 try:
+    import torch
+    TORCH_AVAILABLE = True
+except ImportError:
+    TORCH_AVAILABLE = False
+    torch = None
+
+try:
     import requests
 except ImportError:
     requests = None
@@ -43,6 +50,7 @@ class LightweightReranker:
         api_base: str | None = None,
         api_key: str | None = None,
         device: str | None = None,
+        batch_size: int = 32,
     ):
         """
         Initialize the lightweight reranker.
@@ -52,13 +60,15 @@ class LightweightReranker:
             use_api: Whether to use API instead of local model
             api_base: API base URL (if using API)
             api_key: API key (if using API)
-            device: Device to use ("cpu", "cuda", etc.). If None, auto-detect.
+            device: Device to use ("cpu", "cuda", "mps", etc.). If None, auto-detect.
+            batch_size: Batch size for processing (32 or 64 recommended for Mac MPS)
         """
         self.model_name = model_name
         self.use_api = use_api
         self.api_base = api_base
         self.api_key = api_key
         self.device = device
+        self.batch_size = batch_size
         
         if use_api:
             if not api_base:
@@ -71,13 +81,24 @@ class LightweightReranker:
                     "FlagReranker is not available. Install with: pip install FlagEmbedding"
                 )
             try:
+                # FlagReranker uses FP16 by default (use_fp16=True)
+                # For device, FlagReranker will auto-detect, but we can set torch device if available
+                if TORCH_AVAILABLE and device:
+                    # Set default device for torch operations
+                    if device == "mps" and torch.backends.mps.is_available():
+                        torch.set_default_device("mps")
+                        LOGGER.info("Using MPS device for reranker")
+                    elif device == "cuda" and torch.cuda.is_available():
+                        torch.set_default_device("cuda")
+                        LOGGER.info("Using CUDA device for reranker")
+                    else:
+                        LOGGER.info("Using CPU device for reranker")
+                
                 self.model = FlagReranker(model_name, use_fp16=True)
-                if device:
-                    # FlagReranker doesn't have explicit device parameter,
-                    # but we can log it
-                    LOGGER.info("Initialized local reranker: %s (device: %s)", model_name, device)
-                else:
-                    LOGGER.info("Initialized local reranker: %s", model_name)
+                LOGGER.info(
+                    "Initialized local reranker: %s (device: %s, batch_size: %d, fp16: True)",
+                    model_name, device or "auto", batch_size
+                )
             except Exception as e:
                 error_msg = str(e)
                 # Provide helpful suggestions for common errors
@@ -109,7 +130,7 @@ class LightweightReranker:
         top_k: int = 20,
     ) -> List[Tuple[str, float]]:
         """
-        Rerank items based on query relevance.
+        Rerank items based on query relevance with batch processing.
         
         Args:
             query: User query
@@ -122,9 +143,12 @@ class LightweightReranker:
         if not items:
             return []
         
-        if len(items) <= top_k:
-            # If we have fewer items than top_k, return all with dummy scores
-            LOGGER.debug("Only %d items, returning all without reranking", len(items))
+        # Only use dummy scores if we have significantly fewer items than top_k
+        # This avoids returning dummy scores when we want actual scores for all items
+        if len(items) < top_k and top_k > len(items) * 2:
+            # If we have much fewer items than top_k (e.g., 5 items but top_k=20),
+            # return all with dummy scores to avoid unnecessary computation
+            LOGGER.debug("Only %d items (much fewer than top_k=%d), returning all without reranking", len(items), top_k)
             return [(item_id, 1.0) for item_id, _ in items]
         
         pairs = [(query, text) for _, text in items]
@@ -132,9 +156,23 @@ class LightweightReranker:
         if self.use_api:
             scores = self._rerank_via_api(pairs)
         else:
-            scores = self.model.compute_score(pairs)
+            # Process in batches for better performance
+            all_scores = []
+            for i in range(0, len(pairs), self.batch_size):
+                batch_pairs = pairs[i:i + self.batch_size]
+                batch_scores = self.model.compute_score(batch_pairs)
+                
+                # Handle both single score and list of scores
+                if isinstance(batch_scores, (int, float)):
+                    batch_scores = [float(batch_scores)] * len(batch_pairs)
+                else:
+                    batch_scores = [float(s) for s in batch_scores]
+                
+                all_scores.extend(batch_scores)
+            
+            scores = all_scores
         
-        # Handle both single score and list of scores
+        # Handle both single score and list of scores (fallback for non-batched)
         if isinstance(scores, (int, float)):
             # Single score (shouldn't happen with multiple pairs, but handle it)
             scores = [float(scores)] * len(pairs)
@@ -147,10 +185,17 @@ class LightweightReranker:
         # Sort by score (descending) and return top_k
         scored_items.sort(key=lambda x: x[1], reverse=True)
         
+        if scored_items:
+            score_range = (
+                scored_items[0][1],
+                scored_items[min(top_k-1, len(scored_items)-1)][1] if len(scored_items) >= top_k else scored_items[-1][1]
+            )
+        else:
+            score_range = (0.0, 0.0)
+        
         LOGGER.info(
-            "Reranked %d items to top-%d: score range [%.4f, %.4f]",
-            len(items), top_k, scored_items[0][1] if scored_items else 0,
-            scored_items[top_k-1][1] if len(scored_items) >= top_k else (scored_items[-1][1] if scored_items else 0)
+            "Reranked %d items to top-%d: score range [%.4f, %.4f] (batch_size: %d)",
+            len(items), top_k, score_range[0], score_range[1], self.batch_size
         )
         
         return scored_items[:top_k]
