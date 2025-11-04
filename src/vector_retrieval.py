@@ -42,6 +42,13 @@ try:
 except ImportError:
     hnswlib = None  # Optional for HNSW indexing
 
+try:
+    from sentence_transformers import SentenceTransformer
+    SENTENCE_TRANSFORMERS_AVAILABLE = True
+except ImportError:
+    SentenceTransformer = None  # Optional for local query embedding
+    SENTENCE_TRANSFORMERS_AVAILABLE = False
+
 # Import shared utilities
 from src.bm25_retrieval import Candidates, load_food_candidates
 
@@ -362,16 +369,18 @@ class VectorRetriever:
     def __init__(
         self,
         candidates: Sequence[Candidates],
-        # OpenAI API parameters (required)
-        api_base: str,
-        api_key: str,
-        model_name: str,
+        # Model parameters (choose one: API or local)
+        api_base: str | None = None,  # Optional: API base URL (if using API)
+        api_key: str | None = None,  # Optional: API key (if using API)
+        model_name: str | None = None,  # Optional: API model name (if using API)
+        # Local model parameters (alternative to API)
+        local_model_name: str | None = None,  # Optional: Local SentenceTransformer model name (e.g., "sentence-transformers/paraphrase-multilingual-MiniLM-L12-v2")
         normalize_embeddings: bool = True,
-        max_tokens_per_request: int = 8192,  # Max total tokens per API request
-        max_items_per_batch: int | None = None,  # Optional: Max items per request (only for very short texts)
-        rpm_limit: int = 300,  # Requests per minute limit (0 = no limit)
-        timeout: float = 120.0,
-        dimensions: int | None = None,  # Optional: Output dimensions (text-embedding-3+ only)
+        max_tokens_per_request: int = 8192,  # Max total tokens per API request (only for API mode)
+        max_items_per_batch: int | None = None,  # Optional: Max items per request (only for API mode, very short texts)
+        rpm_limit: int = 300,  # Requests per minute limit (only for API mode, 0 = no limit)
+        timeout: float = 120.0,  # Timeout for API requests (only for API mode)
+        dimensions: int | None = None,  # Optional: Output dimensions (only for API mode, text-embedding-3+ only)
         # HNSW indexing parameters
         use_hnsw: bool = True,  # Whether to use HNSW index for faster search
         index_path: Path | str | None = None,  # Path to save/load HNSW index file or directory.
@@ -384,12 +393,51 @@ class VectorRetriever:
         # Embeddings caching parameters
         embeddings_dir: Path | str | None = None,  # Directory to save/load embeddings cache
         cache_embeddings: bool = True,  # Whether to cache embeddings to disk for reuse
+        # Query embedding parameters (optional, defaults to local_model_name if not set)
+        query_embedding_model: str | None = None,  # Optional: Local SentenceTransformer model for query embeddings (defaults to local_model_name if not set)
     ) -> None:
         self.candidates = list(candidates)
         
-        # Store model info for later use
-        self.model_name = model_name
-        self.dimensions = dimensions
+        # Determine if using API or local model
+        if local_model_name:
+            self.use_api = False
+            self.local_model_name = local_model_name
+            self.model_name = local_model_name  # For display/caching purposes
+            # Get dimension from model (will be determined when model is loaded)
+            self.dimensions = None  # Will be determined from model
+            # Local model doesn't need API parameters
+            self.api_base = None
+            self.api_key = None
+            self.max_tokens_per_request = None
+            self.max_items_per_batch = None
+            self.timeout = None
+            self.sleep_between_requests = 0.0
+        elif api_base or api_key:
+            self.use_api = True
+            self.local_model_name = None
+            self.model_name = model_name
+            self.dimensions = dimensions
+            # API parameters
+            if not api_key:
+                raise ValueError("api_key is required when using API mode")
+            if api_base is None:
+                api_base = "https://api.openai.com/v1"
+            self.api_base = api_base
+            self.api_key = api_key
+            self.max_tokens_per_request = max_tokens_per_request
+            self.max_items_per_batch = max_items_per_batch
+            self.timeout = timeout
+            if rpm_limit > 0:
+                self.sleep_between_requests = 60.0 / rpm_limit
+            else:
+                self.sleep_between_requests = 0.0
+        else:
+            raise ValueError("Either local_model_name or (api_base/api_key) must be provided")
+        
+        # Store query embedding model (defaults to local_model_name if not set)
+        self.query_embedding_model = query_embedding_model or local_model_name
+        self.query_model = None  # Will be initialized lazily if needed
+        self.doc_model = None  # Will be initialized lazily if needed for local model
         
         # Determine index path: handle both file path and directory path
         if index_path is None:
@@ -416,9 +464,6 @@ class VectorRetriever:
             embeddings_dir = self.index_dir
         self.embeddings_dir = Path(embeddings_dir) if embeddings_dir else None
         
-        # Determine if using API: either api_base is provided, or api_key is provided (use standard OpenAI API)
-        self.use_api = api_base is not None or (api_key is not None and api_key)
-        
         # Store HNSW parameters
         self.use_hnsw = use_hnsw and hnswlib is not None
         self.hnsw_m = hnsw_m
@@ -444,29 +489,41 @@ class VectorRetriever:
             if self.index_path is not None:
                 index_path_obj = self.index_path
             else:
-                index_path_obj = self._get_index_path(model_name, dimensions, len(candidates))
+                # Use model_name for index path generation (works for both API and local models)
+                index_path_obj = self._get_index_path(self.model_name, self.dimensions, len(candidates))
             
             if index_path_obj and index_path_obj.exists():
                 try:
                     # Try to get dimension: use provided dimensions, or try to infer from embeddings cache
                     dimension = None
-                    if dimensions:
-                        dimension = dimensions
+                    if self.dimensions:
+                        dimension = self.dimensions
                     elif self.cache_embeddings and self.embeddings_dir:
                         # Try loading cached embeddings to get dimension
-                        cached_embeddings = self._load_cached_embeddings(model_name, dimensions, len(candidates))
+                        cached_embeddings = self._load_cached_embeddings(self.model_name, self.dimensions, len(candidates))
                         if cached_embeddings is not None:
                             dimension = cached_embeddings.shape[1]
                     
-                    # If still no dimension, use default (will be verified when loading)
+                    # If still no dimension, try to infer from model name
                     if dimension is None:
-                        # Common dimensions for embedding models
-                        if 'small' in model_name.lower():
-                            dimension = 1536  # text-embedding-3-small default
-                        elif 'large' in model_name.lower():
-                            dimension = 3072  # text-embedding-3-large default
+                        if self.local_model_name:
+                            # For local models, try common dimensions based on model name
+                            if 'minilm' in self.local_model_name.lower() and 'l12' in self.local_model_name.lower():
+                                dimension = 384  # paraphrase-multilingual-MiniLM-L12-v2
+                            elif 'multilingual' in self.local_model_name.lower():
+                                dimension = 384  # Common for multilingual models
+                            else:
+                                dimension = 768  # Common default
+                        elif self.model_name:
+                            # Common dimensions for API embedding models
+                            if 'small' in self.model_name.lower():
+                                dimension = 1536  # text-embedding-3-small default
+                            elif 'large' in self.model_name.lower():
+                                dimension = 3072  # text-embedding-3-large default
+                            else:
+                                dimension = 768  # Common default
                         else:
-                            dimension = 768  # Common default
+                            dimension = 384  # Fallback default
                     
                     # Create index with estimated dimension
                     space = 'cosine' if self.normalize_embeddings else 'l2'
@@ -496,37 +553,15 @@ class VectorRetriever:
         # Only load embeddings if:
         # 1. Index not loaded AND we're using HNSW (need to build index)
         # 2. Not using HNSW (need for linear search)
-        # Initialize API-related attributes if using API mode (needed for search queries)
-        if self.use_api:
-            if not api_key:
-                raise ValueError("api_key is required when using OpenAI API")
-            
-            # If api_base is None but api_key is provided, use standard OpenAI API
-            if api_base is None:
-                api_base = "https://api.openai.com/v1"
-            
-            self.api_base = api_base
-            self.api_key = api_key
-            self.model_name = model_name
-            self.max_tokens_per_request = max_tokens_per_request
-            self.max_items_per_batch = max_items_per_batch
-            self.timeout = timeout
-            self.dimensions = dimensions
-            
-            # Calculate sleep time based on RPM limit
-            if rpm_limit > 0:
-                self.sleep_between_requests = 60.0 / rpm_limit
-            else:
-                self.sleep_between_requests = 0.0
-            
-            self.model = None  # No local model needed in API mode
-        
         if not embeddings_loaded and not index_loaded:
             # Try to load cached embeddings first
             if self.cache_embeddings and self.embeddings_dir:
-                cached_embeddings = self._load_cached_embeddings(model_name, dimensions, len(candidates))
+                cached_embeddings = self._load_cached_embeddings(self.model_name, self.dimensions, len(candidates))
                 if cached_embeddings is not None:
                     self.doc_embeddings = cached_embeddings
+                    # Update dimensions from cached embeddings
+                    if self.dimensions is None:
+                        self.dimensions = cached_embeddings.shape[1]
                     print(f"✓ Loaded cached embeddings. Shape: {self.doc_embeddings.shape}")
                     embeddings_loaded = True
         
@@ -539,19 +574,19 @@ class VectorRetriever:
                 # Pre-compute document embeddings using API
                 texts = [doc.text for doc in self.candidates]
                 print(f"Computing embeddings for {len(texts)} documents using OpenAI API...")
-                print(f"  Model: {model_name}")
-                print(f"  Max tokens per request: {max_tokens_per_request:,}")
-                if max_items_per_batch is not None:
-                    print(f"  Max items per request: {max_items_per_batch}")
+                print(f"  Model: {self.model_name}")
+                print(f"  Max tokens per request: {self.max_tokens_per_request:,}")
+                if self.max_items_per_batch is not None:
+                    print(f"  Max items per request: {self.max_items_per_batch}")
                 else:
                     print(f"  Max items per request: unlimited (only token limit)")
-                if dimensions is not None:
-                    print(f"  Dimensions: {dimensions}")
+                if self.dimensions is not None:
+                    print(f"  Dimensions: {self.dimensions}")
                 else:
                     print(f"  Dimensions: default (model-dependent)")
                 
                 # Get batch info
-                batch_info = get_batch_info(texts, max_tokens_per_request)
+                batch_info = get_batch_info(texts, self.max_tokens_per_request)
                 print(f"  Total tokens: {batch_info['total_tokens']:,}")
                 print(f"  Estimated API requests: {batch_info['estimated_batches']}")
                 
@@ -561,9 +596,9 @@ class VectorRetriever:
                 
                 for batch_texts in batch_by_tokens(
                     texts,
-                    max_tokens_per_request=max_tokens_per_request,
-                    max_items_per_batch=max_items_per_batch,
-                    model_name=model_name,
+                    max_tokens_per_request=self.max_tokens_per_request,
+                    max_items_per_batch=self.max_items_per_batch,
+                    model_name=self.model_name,
                 ):
                     batch_num += 1
                     batch_tokens = estimate_batch_tokens(batch_texts)
@@ -588,6 +623,10 @@ class VectorRetriever:
                 self.doc_embeddings = np.array(all_embeddings)
                 print(f"Embeddings computed. Shape: {self.doc_embeddings.shape}")
                 
+                # Update dimensions from computed embeddings
+                if self.dimensions is None:
+                    self.dimensions = self.doc_embeddings.shape[1]
+                
                 # Normalize if requested
                 if normalize_embeddings:
                     norms = np.linalg.norm(self.doc_embeddings, axis=1, keepdims=True)
@@ -596,16 +635,73 @@ class VectorRetriever:
                 
                 # Save embeddings cache if enabled
                 if self.cache_embeddings and self.embeddings_dir:
-                    self._save_cached_embeddings(model_name, dimensions)
+                    self._save_cached_embeddings(self.model_name, self.dimensions)
                 
-                # Mark embeddings as loaded and set model to None for API mode
+                # Mark embeddings as loaded
                 embeddings_loaded = True
-                self.model = None  # No local model needed in API mode
+                
+            elif self.local_model_name:
+                # Local model mode - compute embeddings using SentenceTransformer
+                if not SENTENCE_TRANSFORMERS_AVAILABLE:
+                    raise ImportError(
+                        "SentenceTransformer is required for local model embeddings. "
+                        "Install with: pip install sentence-transformers"
+                    )
+                
+                # Initialize local model if not already initialized
+                if self.doc_model is None:
+                    print(f"Loading local embedding model: {self.local_model_name}")
+                    model_load_start = time.time()
+                    self.doc_model = SentenceTransformer(self.local_model_name)
+                    model_load_time = time.time() - model_load_start
+                    print(f"✓ Local model loaded in {model_load_time:.2f}s")
+                    
+                    # Get dimension from model
+                    # Create a dummy embedding to get dimension
+                    test_embedding = self.doc_model.encode(["test"], normalize_embeddings=normalize_embeddings)[0]
+                    self.dimensions = len(test_embedding)
+                    print(f"  Model dimension: {self.dimensions}")
+                
+                # Pre-compute document embeddings using local model
+                texts = [doc.text for doc in self.candidates]
+                print(f"Computing embeddings for {len(texts)} documents using local model...")
+                print(f"  Model: {self.local_model_name}")
+                print(f"  Dimension: {self.dimensions}")
+                
+                # Process in batches for better performance (local model can handle large batches)
+                # Use a reasonable batch size for local processing
+                batch_size = 32  # Process 32 items at a time
+                all_embeddings = []
+                
+                for i in range(0, len(texts), batch_size):
+                    batch_texts = texts[i:i + batch_size]
+                    batch_num = (i // batch_size) + 1
+                    total_batches = (len(texts) + batch_size - 1) // batch_size
+                    print(f"  Processing batch {batch_num}/{total_batches}: {len(batch_texts)} items")
+                    
+                    batch_embeddings = self.doc_model.encode(
+                        batch_texts,
+                        normalize_embeddings=normalize_embeddings,
+                        show_progress_bar=False
+                    )
+                    all_embeddings.append(batch_embeddings)
+                
+                # Concatenate all batches
+                self.doc_embeddings = np.vstack(all_embeddings)
+                print(f"Embeddings computed. Shape: {self.doc_embeddings.shape}")
+                
+                # Save embeddings cache if enabled
+                if self.cache_embeddings and self.embeddings_dir:
+                    self._save_cached_embeddings(self.model_name, self.dimensions)
+                
+                # Mark embeddings as loaded
+                embeddings_loaded = True
                 
             else:
-                # This should never happen if use_api is correctly set
+                # This should never happen
                 raise ValueError(
-                    "Local model mode is not supported. Please use OpenAI API mode by providing api_key."
+                    "Either use_api=True or local_model_name must be provided. "
+                    "This error should not occur."
                 )
         
         # Build HNSW index if needed (and not already loaded)
@@ -740,7 +836,52 @@ class VectorRetriever:
             return []
         
         # Encode query
-        if self.use_api:
+        # Use local model for query embedding if specified, otherwise use API
+        if self.query_embedding_model:
+            # Use local SentenceTransformer model for query embedding
+            if not SENTENCE_TRANSFORMERS_AVAILABLE:
+                raise ImportError(
+                    "SentenceTransformer is required for local query embedding. "
+                    "Install with: pip install sentence-transformers"
+                )
+            
+            # Lazy initialization of query model
+            if self.query_model is None:
+                print(f"  Loading local query embedding model: {self.query_embedding_model}")
+                query_embedding_start = time.time()
+                self.query_model = SentenceTransformer(self.query_embedding_model)
+                load_time = time.time() - query_embedding_start
+                print(f"  ✓ Local query model loaded in {load_time:.2f}s")
+            
+            query_embedding_start = time.time()
+            query_embedding = self.query_model.encode([query], normalize_embeddings=self.normalize_embeddings)[0]
+            query_embedding_time = time.time() - query_embedding_start
+            print(f"  Query embedding (local model) completed in {query_embedding_time:.3f}s")
+            query_embedding = np.array(query_embedding)
+            
+            # Check dimension mismatch (query embedding vs document embeddings) - CRITICAL
+            query_dim = len(query_embedding)
+            if self.use_hnsw and self.hnsw_index is not None:
+                doc_dim = self.hnsw_index.dim
+                if query_dim != doc_dim:
+                    raise ValueError(
+                        f"Dimension mismatch: Query embedding dimension ({query_dim}) != Document embedding dimension ({doc_dim}).\n"
+                        f"  Query model: {self.query_embedding_model}\n"
+                        f"  Document model: {self.model_name}\n"
+                        f"  This will cause search to fail. Please use the same embedding model for both queries and documents,\n"
+                        f"  or ensure the dimensions match."
+                    )
+            elif self.doc_embeddings is not None:
+                doc_dim = self.doc_embeddings.shape[1]
+                if query_dim != doc_dim:
+                    raise ValueError(
+                        f"Dimension mismatch: Query embedding dimension ({query_dim}) != Document embedding dimension ({doc_dim}).\n"
+                        f"  Query model: {self.query_embedding_model}\n"
+                        f"  Document model: {self.model_name}\n"
+                        f"  This will cause search to fail. Please use the same embedding model for both queries and documents,\n"
+                        f"  or ensure the dimensions match."
+                    )
+        elif self.use_api:
             # Use API for query embedding
             query_embedding_start = time.time()
             query_embeddings = call_embedding_api(
@@ -763,8 +904,8 @@ class VectorRetriever:
                 if norm > 0:
                     query_embedding = query_embedding / norm
         else:
-            # This should never happen - API mode is required
-            raise ValueError("Local model mode is not supported. API mode is required.")
+            # This should never happen - API mode is required for document embeddings
+            raise ValueError("API mode is required for document embeddings. Query embedding can use local model if query_embedding_model is specified.")
         
         # Use HNSW index if available, otherwise use linear search
         if self.use_hnsw and self.hnsw_index is not None:

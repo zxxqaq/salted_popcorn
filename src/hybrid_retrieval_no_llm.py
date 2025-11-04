@@ -71,23 +71,26 @@ class HybridRetriever:
         # BM25 parameters (required)
         bm25_k1: float,
         bm25_b: float,
-        # Vector retrieval parameters (required)
-        vector_api_base: str,
-        vector_api_key: str,
-        vector_model_name: str,
-        vector_dimensions: int,
-        vector_max_tokens_per_request: int,
-        vector_max_items_per_batch: int | None,
-        vector_rpm_limit: int,
-        vector_timeout: float,
-        vector_normalize_embeddings: bool,
+        # Vector retrieval parameters (choose one: API or local model)
+        # API parameters (optional, if using API)
+        vector_api_base: str | None = None,
+        vector_api_key: str | None = None,
+        vector_model_name: str | None = None,  # API model name (e.g., "text-embedding-3-small")
+        vector_dimensions: int | None = None,  # API model dimensions
+        vector_max_tokens_per_request: int = 8192,
+        vector_max_items_per_batch: int | None = None,
+        vector_rpm_limit: int = 300,
+        vector_timeout: float = 120.0,
+        # Local model parameters (optional, if using local model)
+        vector_local_model_name: str | None = None,  # Local SentenceTransformer model (e.g., "sentence-transformers/paraphrase-multilingual-MiniLM-L12-v2")
+        vector_normalize_embeddings: bool = True,
         vector_hnsw_index_path: Path | str,  # Required: path to existing HNSW index file
-        vector_use_hnsw: bool,
-        vector_hnsw_m: int,
-        vector_hnsw_ef_construction: int,
-        vector_hnsw_ef_search: int,
-        vector_embeddings_dir: Path | str | None,
-        vector_cache_embeddings: bool,
+        vector_use_hnsw: bool = True,
+        vector_hnsw_m: int = 32,
+        vector_hnsw_ef_construction: int = 100,
+        vector_hnsw_ef_search: int = 64,
+        vector_embeddings_dir: Path | str | None = None,
+        vector_cache_embeddings: bool = True,
         # Retrieval parameters (required)
         retrieval_top_k: int,  # Top-K for each retrieval method (default: 50)
         # RRF fusion parameters (required)
@@ -102,6 +105,8 @@ class HybridRetriever:
         reranker_device: str | None = None,  # Device to use ("mps", "cuda", "cpu", or None for auto)
         reranker_batch_size: int = 32,  # Batch size for Cross-Encoder (32 or 64 recommended for Mac MPS)
         reranker_top_k: int | None = None,  # Top-K items to return from reranker (None = return all scored items)
+        # Query embedding parameters (optional, must come after all required parameters)
+        vector_query_embedding_model: str | None = None,  # Optional: Local SentenceTransformer model for query embeddings
     ) -> None:
         """
         Initialize hybrid retriever.
@@ -112,22 +117,24 @@ class HybridRetriever:
             candidates: Sequence of candidate documents
             bm25_k1: BM25 k1 parameter (required)
             bm25_b: BM25 b parameter (required)
-            vector_api_base: Vector API base URL (required)
-            vector_api_key: Vector API key (required)
-            vector_model_name: Vector model name (required)
-            vector_dimensions: Vector embedding dimensions (required)
-            vector_max_tokens_per_request: Max tokens per API request (required)
-            vector_max_items_per_batch: Max items per batch (required, None for unlimited)
-            vector_rpm_limit: Requests per minute limit (required)
-            vector_timeout: Request timeout (required)
+            vector_api_base: Vector API base URL (optional, if using API)
+            vector_api_key: Vector API key (optional, if using API)
+            vector_model_name: Vector API model name (optional, if using API, e.g., "text-embedding-3-small")
+            vector_dimensions: Vector API model dimensions (optional, if using API)
+            vector_max_tokens_per_request: Max tokens per API request (optional, only for API mode)
+            vector_max_items_per_batch: Max items per batch (optional, only for API mode, None for unlimited)
+            vector_rpm_limit: Requests per minute limit (optional, only for API mode)
+            vector_timeout: Request timeout (optional, only for API mode)
+            vector_local_model_name: Local SentenceTransformer model name (optional, if using local model, e.g., "sentence-transformers/paraphrase-multilingual-MiniLM-L12-v2")
             vector_normalize_embeddings: Whether to normalize embeddings (required)
             vector_hnsw_index_path: Path to existing HNSW index file (required, must exist)
             vector_use_hnsw: Whether to use HNSW indexing (required)
             vector_hnsw_m: HNSW M parameter (required)
             vector_hnsw_ef_construction: HNSW ef_construction parameter (required)
             vector_hnsw_ef_search: HNSW ef_search parameter (required)
-            vector_embeddings_dir: Directory for embeddings cache (required, None if not used)
+            vector_embeddings_dir: Directory for embeddings cache (optional, None if not used)
             vector_cache_embeddings: Whether to cache embeddings (required)
+            vector_query_embedding_model: Optional local SentenceTransformer model for query embeddings (defaults to vector_local_model_name if not set)
             retrieval_top_k: Top-K results to retrieve from each method (required, typically 50)
             use_rrf: Whether to use RRF fusion before Cross-Encoder re-ranking (required)
             rrf_k: RRF constant k (required, typically 60)
@@ -169,25 +176,48 @@ class HybridRetriever:
         )
         
         # Initialize Vector retriever with all required parameters
-        self.vector_retriever = VectorRetriever(
-            candidates,
-            api_base=vector_api_base,
-            api_key=vector_api_key,
-            model_name=vector_model_name,
-            normalize_embeddings=vector_normalize_embeddings,
-            max_tokens_per_request=vector_max_tokens_per_request,
-            max_items_per_batch=vector_max_items_per_batch,
-            rpm_limit=vector_rpm_limit,
-            timeout=vector_timeout,
-            dimensions=vector_dimensions,
-            use_hnsw=vector_use_hnsw,
-            index_path=vector_hnsw_index_path_obj,  # Use the validated path
-            hnsw_m=vector_hnsw_m,
-            hnsw_ef_construction=vector_hnsw_ef_construction,
-            hnsw_ef_search=vector_hnsw_ef_search,
-            embeddings_dir=Path(vector_embeddings_dir) if vector_embeddings_dir else None,
-            cache_embeddings=vector_cache_embeddings,
-        )
+        # Determine if using API or local model
+        if vector_local_model_name:
+            # Use local model
+            self.vector_retriever = VectorRetriever(
+                candidates,
+                local_model_name=vector_local_model_name,
+                normalize_embeddings=vector_normalize_embeddings,
+                use_hnsw=vector_use_hnsw,
+                index_path=vector_hnsw_index_path_obj,  # Use the validated path
+                hnsw_m=vector_hnsw_m,
+                hnsw_ef_construction=vector_hnsw_ef_construction,
+                hnsw_ef_search=vector_hnsw_ef_search,
+                embeddings_dir=Path(vector_embeddings_dir) if vector_embeddings_dir else None,
+                cache_embeddings=vector_cache_embeddings,
+                query_embedding_model=vector_query_embedding_model,  # Optional: local model for query embeddings (defaults to local_model_name)
+            )
+        elif vector_api_key:
+            # Use API
+            self.vector_retriever = VectorRetriever(
+                candidates,
+                api_base=vector_api_base or "https://api.openai.com/v1",
+                api_key=vector_api_key,
+                model_name=vector_model_name,
+                normalize_embeddings=vector_normalize_embeddings,
+                max_tokens_per_request=vector_max_tokens_per_request,
+                max_items_per_batch=vector_max_items_per_batch,
+                rpm_limit=vector_rpm_limit,
+                timeout=vector_timeout,
+                dimensions=vector_dimensions,
+                use_hnsw=vector_use_hnsw,
+                index_path=vector_hnsw_index_path_obj,  # Use the validated path
+                hnsw_m=vector_hnsw_m,
+                hnsw_ef_construction=vector_hnsw_ef_construction,
+                hnsw_ef_search=vector_hnsw_ef_search,
+                embeddings_dir=Path(vector_embeddings_dir) if vector_embeddings_dir else None,
+                cache_embeddings=vector_cache_embeddings,
+                query_embedding_model=vector_query_embedding_model,  # Optional: local model for query embeddings
+            )
+        else:
+            raise ValueError(
+                "Either vector_local_model_name or vector_api_key must be provided for vector retrieval."
+            )
         
         # Initialize Cross-Encoder reranker
         if not RERANKER_AVAILABLE:

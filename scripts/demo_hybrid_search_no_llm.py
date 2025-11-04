@@ -176,31 +176,55 @@ def main():
     except ValueError as e:
         raise ValueError(f"Invalid BM25_B value '{bm25_b_str}': {e}")
     
-    # Vector retrieval parameters
-    if not vector_api_base or not vector_api_base.strip():
-        raise ValueError("VECTOR_API_BASE is required. Set it in .env file or environment variable (e.g., 'https://api.openai.com/v1').")
-    vector_api_base = vector_api_base.strip()
+    # Vector retrieval parameters - choose one: Local model or API
+    # Local model (preferred)
+    vector_local_model_name = os.getenv("VECTOR_LOCAL_MODEL_NAME")
+    if vector_local_model_name:
+        vector_local_model_name = vector_local_model_name.strip()
+    else:
+        vector_local_model_name = None
     
+    # API parameters (optional, only needed if not using local model)
+    vector_api_base = os.getenv("VECTOR_API_BASE")
+    if vector_api_base:
+        vector_api_base = vector_api_base.strip()
+    else:
+        vector_api_base = None
+    
+    vector_api_key = os.getenv("VECTOR_API_KEY") or os.getenv("OPENAI_API_KEY")
+    if vector_api_key:
+        vector_api_key = vector_api_key.strip()
+    else:
+        vector_api_key = None
+    
+    # Validate: must have either local model or API config
+    if not vector_local_model_name and not vector_api_key:
+        raise ValueError(
+            "Either VECTOR_LOCAL_MODEL_NAME or VECTOR_API_KEY must be set in .env file.\n"
+            "For local model: VECTOR_LOCAL_MODEL_NAME=sentence-transformers/paraphrase-multilingual-MiniLM-L12-v2\n"
+            "For API: VECTOR_API_KEY=sk-..."
+        )
+    
+    # API parameters (only used if using API)
     vector_model_name = os.getenv("VECTOR_MODEL_NAME")
-    if not vector_model_name or not vector_model_name.strip():
-        raise ValueError("VECTOR_MODEL_NAME is required. Set it in .env file or environment variable (e.g., 'text-embedding-3-small').")
-    vector_model_name = vector_model_name.strip()
+    if vector_model_name:
+        vector_model_name = vector_model_name.strip()
+    else:
+        vector_model_name = None
     
     vector_dimensions_str = os.getenv("VECTOR_DIMENSIONS")
-    if not vector_dimensions_str or not vector_dimensions_str.strip():
-        raise ValueError("VECTOR_DIMENSIONS is required. Set it in .env file or environment variable (e.g., '1536').")
-    try:
-        vector_dimensions = int(vector_dimensions_str.strip())
-        if vector_dimensions <= 0:
-            raise ValueError(f"vector_dimensions must be positive, got {vector_dimensions}")
-    except ValueError as e:
-        raise ValueError(f"Invalid VECTOR_DIMENSIONS value '{vector_dimensions_str}': {e}")
+    vector_dimensions = None
+    if vector_dimensions_str and vector_dimensions_str.strip():
+        try:
+            vector_dimensions = int(vector_dimensions_str.strip())
+            if vector_dimensions <= 0:
+                raise ValueError(f"vector_dimensions must be positive, got {vector_dimensions}")
+        except ValueError as e:
+            raise ValueError(f"Invalid VECTOR_DIMENSIONS value '{vector_dimensions_str}': {e}")
     
-    vector_max_tokens_per_request_str = os.getenv("VECTOR_MAX_TOKENS_PER_REQUEST")
-    if not vector_max_tokens_per_request_str or not vector_max_tokens_per_request_str.strip():
-        raise ValueError("VECTOR_MAX_TOKENS_PER_REQUEST is required. Set it in .env file or environment variable (e.g., '8192').")
+    vector_max_tokens_per_request_str = os.getenv("VECTOR_MAX_TOKENS_PER_REQUEST", "8192").strip()
     try:
-        vector_max_tokens_per_request = int(vector_max_tokens_per_request_str.strip())
+        vector_max_tokens_per_request = int(vector_max_tokens_per_request_str)
         if vector_max_tokens_per_request <= 0:
             raise ValueError(f"vector_max_tokens_per_request must be positive, got {vector_max_tokens_per_request}")
     except ValueError as e:
@@ -216,21 +240,17 @@ def main():
         except ValueError as e:
             raise ValueError(f"Invalid VECTOR_MAX_ITEMS_PER_BATCH value '{vector_max_items_per_batch_str}': {e}")
     
-    vector_rpm_limit_str = os.getenv("VECTOR_RPM_LIMIT")
-    if not vector_rpm_limit_str or not vector_rpm_limit_str.strip():
-        raise ValueError("VECTOR_RPM_LIMIT is required. Set it in .env file or environment variable (e.g., '300').")
+    vector_rpm_limit_str = os.getenv("VECTOR_RPM_LIMIT", "300").strip()
     try:
-        vector_rpm_limit = int(vector_rpm_limit_str.strip())
+        vector_rpm_limit = int(vector_rpm_limit_str)
         if vector_rpm_limit <= 0:
             raise ValueError(f"vector_rpm_limit must be positive, got {vector_rpm_limit}")
     except ValueError as e:
         raise ValueError(f"Invalid VECTOR_RPM_LIMIT value '{vector_rpm_limit_str}': {e}")
     
-    vector_timeout_str = os.getenv("VECTOR_TIMEOUT")
-    if not vector_timeout_str or not vector_timeout_str.strip():
-        raise ValueError("VECTOR_TIMEOUT is required. Set it in .env file or environment variable (e.g., '120.0').")
+    vector_timeout_str = os.getenv("VECTOR_TIMEOUT", "120.0").strip()
     try:
-        vector_timeout = float(vector_timeout_str.strip())
+        vector_timeout = float(vector_timeout_str)
         if vector_timeout <= 0:
             raise ValueError(f"vector_timeout must be positive, got {vector_timeout}")
     except ValueError as e:
@@ -295,6 +315,13 @@ def main():
     
     vector_cache_embeddings_str = os.getenv("VECTOR_CACHE_EMBEDDINGS", "True").strip().lower()
     vector_cache_embeddings = vector_cache_embeddings_str in ("true", "1", "yes")
+    
+    # Query embedding model (optional, for local query embedding)
+    vector_query_embedding_model = os.getenv("VECTOR_QUERY_EMBEDDING_MODEL")
+    if vector_query_embedding_model:
+        vector_query_embedding_model = vector_query_embedding_model.strip()
+        if not vector_query_embedding_model:
+            vector_query_embedding_model = None
     
     # Retrieval parameters
     retrieval_top_k_str = os.getenv("RETRIEVAL_TOP_K")
@@ -392,7 +419,16 @@ def main():
     # Initialize hybrid retriever
     print("\nInitializing hybrid retriever...")
     print(f"  • BM25: k1={bm25_k1}, b={bm25_b}")
-    print(f"  • Vector: {vector_model_name} (dim={vector_dimensions})")
+    if vector_local_model_name:
+        if vector_query_embedding_model and vector_query_embedding_model != vector_local_model_name:
+            print(f"  • Vector: {vector_local_model_name} - Items: Local, Query: {vector_query_embedding_model}")
+        else:
+            print(f"  • Vector: {vector_local_model_name} - Items & Query: Local")
+    else:
+        if vector_query_embedding_model:
+            print(f"  • Vector: {vector_model_name} (dim={vector_dimensions}) - Items: API, Query: {vector_query_embedding_model}")
+        else:
+            print(f"  • Vector: {vector_model_name} (dim={vector_dimensions}) - Items & Query: API")
     print(f"  • Cross-Encoder: {reranker_model} (device={reranker_device or 'auto'}, batch_size={reranker_batch_size}, fp16=True)")
     if reranker_top_k is not None:
         print(f"  • Cross-Encoder top-K: {reranker_top_k} (will return top-{reranker_top_k} items)")
@@ -411,15 +447,16 @@ def main():
         # BM25 parameters (required)
         bm25_k1=bm25_k1,
         bm25_b=bm25_b,
-        # Vector retrieval parameters (required)
-        vector_api_base=vector_api_base,
-        vector_api_key=vector_api_key,
-        vector_model_name=vector_model_name,
-        vector_dimensions=vector_dimensions,
-        vector_max_tokens_per_request=vector_max_tokens_per_request,
-        vector_max_items_per_batch=vector_max_items_per_batch,
-        vector_rpm_limit=vector_rpm_limit,
-        vector_timeout=vector_timeout,
+        # Vector retrieval parameters (choose one: local model or API)
+        vector_api_base=vector_api_base,  # Optional, only if using API
+        vector_api_key=vector_api_key,  # Optional, only if using API
+        vector_model_name=vector_model_name,  # Optional, only if using API
+        vector_dimensions=vector_dimensions,  # Optional, only if using API
+        vector_max_tokens_per_request=vector_max_tokens_per_request,  # Optional, only if using API
+        vector_max_items_per_batch=vector_max_items_per_batch,  # Optional, only if using API
+        vector_rpm_limit=vector_rpm_limit,  # Optional, only if using API
+        vector_timeout=vector_timeout,  # Optional, only if using API
+        vector_local_model_name=vector_local_model_name,  # Optional, if using local model
         vector_normalize_embeddings=vector_normalize_embeddings,
         vector_hnsw_index_path=vector_hnsw_index_path,
         vector_use_hnsw=vector_use_hnsw,
@@ -442,6 +479,8 @@ def main():
         reranker_device=reranker_device,
         reranker_batch_size=reranker_batch_size,
         reranker_top_k=reranker_top_k,  # Optional: None = score all items, or set to return top-K
+        # Query embedding parameters (optional)
+        vector_query_embedding_model=vector_query_embedding_model,  # Optional: local model for query embeddings
     )
     print("  ✓ Hybrid retriever initialized")
     
