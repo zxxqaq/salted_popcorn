@@ -36,10 +36,11 @@ except ImportError:
         "Install it with: pip install tiktoken"
     )
 
+
 try:
-    from sentence_transformers import SentenceTransformer
+    import hnswlib
 except ImportError:
-    SentenceTransformer = None  # Optional for OpenAI API mode
+    hnswlib = None  # Optional for HNSW indexing
 
 # Import shared utilities
 from src.bm25_retrieval import Candidates, load_food_candidates
@@ -355,54 +356,148 @@ class VectorRetriever:
     Vector-based retriever supporting both local models and OpenAI API.
     
     Supports:
-    - Local models: SentenceTransformer (offline, no API calls)
     - OpenAI API: text-embedding-3-small, text-embedding-3-large (with automatic batching)
     """
     
     def __init__(
         self,
         candidates: Sequence[Candidates],
-        # Local model parameters
-        model_name: str = "paraphrase-multilingual-MiniLM-L12-v2",
-        device: str | None = None,
+        # OpenAI API parameters (required)
+        api_base: str,
+        api_key: str,
+        model_name: str,
         normalize_embeddings: bool = True,
-        # OpenAI API parameters
-        api_base: str | None = None,
-        api_key: str | None = None,
         max_tokens_per_request: int = 8192,  # Max total tokens per API request
         max_items_per_batch: int | None = None,  # Optional: Max items per request (only for very short texts)
         rpm_limit: int = 300,  # Requests per minute limit (0 = no limit)
         timeout: float = 120.0,
         dimensions: int | None = None,  # Optional: Output dimensions (text-embedding-3+ only)
+        # HNSW indexing parameters
+        use_hnsw: bool = True,  # Whether to use HNSW index for faster search
+        index_path: Path | str | None = None,  # Path to save/load HNSW index file or directory.
+            # If None: uses default directory and auto-generates filename.
+            # If directory: auto-generates filename based on model and dimensions.
+            # If file path: uses the exact path.
+        hnsw_m: int = 32,  # HNSW M parameter (number of connections per node, 16-64)
+        hnsw_ef_construction: int = 100,  # HNSW ef_construction (build-time search range, 100-200)
+        hnsw_ef_search: int = 64,  # HNSW ef_search (search-time search range, 16-256)
+        # Embeddings caching parameters
+        embeddings_dir: Path | str | None = None,  # Directory to save/load embeddings cache
+        cache_embeddings: bool = True,  # Whether to cache embeddings to disk for reuse
     ) -> None:
-        """
-        Initialize vector retriever.
-        
-        Args:
-            candidates: Sequence of candidate documents
-            # Local model parameters
-            model_name: Name of the sentence transformer model (if using local)
-            device: Device to use ('cuda', 'cpu', or None for auto)
-            normalize_embeddings: Whether to normalize embeddings for cosine similarity
-            # OpenAI API parameters
-            api_base: API base URL (if None, uses local model)
-            api_key: API key (required if api_base is set)
-            max_tokens_per_request: Maximum total tokens per API request (for automatic batching)
-            max_items_per_batch: Optional maximum items per request. Only relevant when texts
-                are very short. If None, only token limit is used. Default None.
-            rpm_limit: Requests per minute limit (auto-calculates sleep if set)
-            timeout: Request timeout in seconds
-            dimensions: Optional number of dimensions for output embeddings.
-                Only supported in text-embedding-3 and later models.
-                If None, uses model's default dimensions.
-        """
         self.candidates = list(candidates)
+        
+        # Store model info for later use
+        self.model_name = model_name
+        self.dimensions = dimensions
+        
+        # Determine index path: handle both file path and directory path
+        if index_path is None:
+            # Default: use artifacts/vector_indices directory
+            self.index_dir = Path("artifacts") / "vector_indices"
+            self.index_dir.mkdir(parents=True, exist_ok=True)
+            self.index_path = None  # Will be auto-generated
+        else:
+            index_path_obj = Path(index_path)
+            # Check if it's a file path (ends with .index or exists as file)
+            if index_path_obj.suffix == ".index" or (index_path_obj.exists() and index_path_obj.is_file()):
+                # It's a file path
+                self.index_path = index_path_obj
+                self.index_dir = index_path_obj.parent
+            else:
+                # It's a directory path
+                self.index_dir = index_path_obj
+                self.index_dir.mkdir(parents=True, exist_ok=True)
+                self.index_path = None  # Will be auto-generated
+        
+        # Store embeddings caching parameters
+        self.cache_embeddings = cache_embeddings
+        if embeddings_dir is None:
+            embeddings_dir = self.index_dir
+        self.embeddings_dir = Path(embeddings_dir) if embeddings_dir else None
         
         # Determine if using API: either api_base is provided, or api_key is provided (use standard OpenAI API)
         self.use_api = api_base is not None or (api_key is not None and api_key)
         
+        # Store HNSW parameters
+        self.use_hnsw = use_hnsw and hnswlib is not None
+        self.hnsw_m = hnsw_m
+        self.hnsw_ef_construction = hnsw_ef_construction
+        self.hnsw_ef_search = hnsw_ef_search
+        self.normalize_embeddings = normalize_embeddings
+        
+        # Determine if we can skip loading embeddings (if using HNSW index)
+        # HNSW index contains vectors, so we only need embeddings if:
+        # 1. Not using HNSW (fallback to linear search)
+        # 2. Need to build a new index
+        # 3. Need to verify index matches data
+        
+        # Try to load HNSW index first (if available and using HNSW)
+        self.hnsw_index = None
+        self.doc_embeddings = None
+        embeddings_loaded = False
+        index_loaded = False
+        
+        if self.use_hnsw:
+            # Try to load existing index first
+            # Use explicit path if provided, otherwise generate from directory
+            if self.index_path is not None:
+                index_path_obj = self.index_path
+            else:
+                index_path_obj = self._get_index_path(model_name, dimensions, len(candidates))
+            
+            if index_path_obj and index_path_obj.exists():
+                try:
+                    # Try to get dimension: use provided dimensions, or try to infer from embeddings cache
+                    dimension = None
+                    if dimensions:
+                        dimension = dimensions
+                    elif self.cache_embeddings and self.embeddings_dir:
+                        # Try loading cached embeddings to get dimension
+                        cached_embeddings = self._load_cached_embeddings(model_name, dimensions, len(candidates))
+                        if cached_embeddings is not None:
+                            dimension = cached_embeddings.shape[1]
+                    
+                    # If still no dimension, use default (will be verified when loading)
+                    if dimension is None:
+                        # Common dimensions for embedding models
+                        if 'small' in model_name.lower():
+                            dimension = 1536  # text-embedding-3-small default
+                        elif 'large' in model_name.lower():
+                            dimension = 3072  # text-embedding-3-large default
+                        else:
+                            dimension = 768  # Common default
+                    
+                    # Create index with estimated dimension
+                    space = 'cosine' if self.normalize_embeddings else 'l2'
+                    self.hnsw_index = hnswlib.Index(space=space, dim=dimension)
+                    self.hnsw_index.load_index(str(index_path_obj))
+                    
+                    # Verify dimension matches
+                    if self.hnsw_index.dim != dimension:
+                        raise ValueError(
+                            f"Index dimension mismatch: index has {self.hnsw_index.dim}, "
+                            f"but expected {dimension}. Will rebuild index."
+                        )
+                    
+                    self.hnsw_index.set_ef(self.hnsw_ef_search)
+                    print(f"✓ Loaded HNSW index from: {index_path_obj.name}")
+                    print(f"  Index contains {self.hnsw_index.element_count} vectors, dimension: {self.hnsw_index.dim}")
+                    index_loaded = True
+                    # If index is loaded, we don't need embeddings (index contains vectors)
+                    # Only need candidates for mapping results back to documents
+                    self.doc_embeddings = None
+                    embeddings_loaded = True  # Mark as "loaded" to skip computation
+                except Exception as e:
+                    print(f"  ⚠ Failed to load index: {e}")
+                    print(f"     Will rebuild index...")
+                    self.hnsw_index = None
+        
+        # Only load embeddings if:
+        # 1. Index not loaded AND we're using HNSW (need to build index)
+        # 2. Not using HNSW (need for linear search)
+        # Initialize API-related attributes if using API mode (needed for search queries)
         if self.use_api:
-            # OpenAI API mode
             if not api_key:
                 raise ValueError("api_key is required when using OpenAI API")
             
@@ -412,7 +507,7 @@ class VectorRetriever:
             
             self.api_base = api_base
             self.api_key = api_key
-            self.model_name = model_name  # e.g., "text-embedding-3-small"
+            self.model_name = model_name
             self.max_tokens_per_request = max_tokens_per_request
             self.max_items_per_batch = max_items_per_batch
             self.timeout = timeout
@@ -424,87 +519,211 @@ class VectorRetriever:
             else:
                 self.sleep_between_requests = 0.0
             
-            self.normalize_embeddings = normalize_embeddings
-            
-            # Pre-compute document embeddings using API
-            texts = [doc.text for doc in self.candidates]
-            print(f"Computing embeddings for {len(texts)} documents using OpenAI API...")
-            print(f"  Model: {model_name}")
-            print(f"  Max tokens per request: {max_tokens_per_request:,}")
-            if max_items_per_batch is not None:
-                print(f"  Max items per request: {max_items_per_batch}")
-            else:
-                print(f"  Max items per request: unlimited (only token limit)")
-            if dimensions is not None:
-                print(f"  Dimensions: {dimensions}")
-            else:
-                print(f"  Dimensions: default (model-dependent)")
-            
-            # Get batch info
-            batch_info = get_batch_info(texts, max_tokens_per_request)
-            print(f"  Total tokens: {batch_info['total_tokens']:,}")
-            print(f"  Estimated API requests: {batch_info['estimated_batches']}")
-            
-            # Batch and fetch embeddings
-            all_embeddings = []
-            batch_num = 0
-            
-            for batch_texts in batch_by_tokens(
-                texts,
-                max_tokens_per_request=max_tokens_per_request,
-                max_items_per_batch=max_items_per_batch,
-                model_name=model_name,
-            ):
-                batch_num += 1
-                batch_tokens = estimate_batch_tokens(batch_texts)
-                print(f"  Processing batch {batch_num}: {len(batch_texts)} items, {batch_tokens:,} tokens")
+            self.model = None  # No local model needed in API mode
+        
+        if not embeddings_loaded and not index_loaded:
+            # Try to load cached embeddings first
+            if self.cache_embeddings and self.embeddings_dir:
+                cached_embeddings = self._load_cached_embeddings(model_name, dimensions, len(candidates))
+                if cached_embeddings is not None:
+                    self.doc_embeddings = cached_embeddings
+                    print(f"✓ Loaded cached embeddings. Shape: {self.doc_embeddings.shape}")
+                    embeddings_loaded = True
+        
+        if not embeddings_loaded and not index_loaded:
+            if self.use_api:
+                # OpenAI API mode - compute embeddings using API
+                # Note: API-related attributes are already set above
+                self.normalize_embeddings = normalize_embeddings
                 
-                try:
-                    batch_embeddings = call_embedding_api(
-                        texts=batch_texts,
-                        api_base=self.api_base,
-                        api_key=self.api_key,
-                        model=self.model_name,
-                        timeout=self.timeout,
-                        rpm_limit=rpm_limit,
-                        sleep_between_requests=self.sleep_between_requests,
-                        dimensions=self.dimensions,
-                    )
-                    all_embeddings.extend(batch_embeddings)
-                except Exception as e:
-                    print(f"  Error processing batch {batch_num}: {e}")
-                    raise
-            
-            self.doc_embeddings = np.array(all_embeddings)
-            print(f"Embeddings computed. Shape: {self.doc_embeddings.shape}")
-            
-            # Normalize if requested
-            if normalize_embeddings:
-                norms = np.linalg.norm(self.doc_embeddings, axis=1, keepdims=True)
-                norms = np.where(norms == 0, 1, norms)  # Avoid division by zero
-                self.doc_embeddings = self.doc_embeddings / norms
-        else:
-            # Local model mode
-            if SentenceTransformer is None:
-                raise ImportError(
-                    "sentence_transformers is required for local model mode. "
-                    "Install it with: pip install sentence-transformers"
+                # Pre-compute document embeddings using API
+                texts = [doc.text for doc in self.candidates]
+                print(f"Computing embeddings for {len(texts)} documents using OpenAI API...")
+                print(f"  Model: {model_name}")
+                print(f"  Max tokens per request: {max_tokens_per_request:,}")
+                if max_items_per_batch is not None:
+                    print(f"  Max items per request: {max_items_per_batch}")
+                else:
+                    print(f"  Max items per request: unlimited (only token limit)")
+                if dimensions is not None:
+                    print(f"  Dimensions: {dimensions}")
+                else:
+                    print(f"  Dimensions: default (model-dependent)")
+                
+                # Get batch info
+                batch_info = get_batch_info(texts, max_tokens_per_request)
+                print(f"  Total tokens: {batch_info['total_tokens']:,}")
+                print(f"  Estimated API requests: {batch_info['estimated_batches']}")
+                
+                # Batch and fetch embeddings
+                all_embeddings = []
+                batch_num = 0
+                
+                for batch_texts in batch_by_tokens(
+                    texts,
+                    max_tokens_per_request=max_tokens_per_request,
+                    max_items_per_batch=max_items_per_batch,
+                    model_name=model_name,
+                ):
+                    batch_num += 1
+                    batch_tokens = estimate_batch_tokens(batch_texts)
+                    print(f"  Processing batch {batch_num}: {len(batch_texts)} items, {batch_tokens:,} tokens")
+                    
+                    try:
+                        batch_embeddings = call_embedding_api(
+                            texts=batch_texts,
+                            api_base=self.api_base,
+                            api_key=self.api_key,
+                            model=self.model_name,
+                            timeout=self.timeout,
+                            rpm_limit=rpm_limit,
+                            sleep_between_requests=self.sleep_between_requests,
+                            dimensions=self.dimensions,
+                        )
+                        all_embeddings.extend(batch_embeddings)
+                    except Exception as e:
+                        print(f"  Error processing batch {batch_num}: {e}")
+                        raise
+                
+                self.doc_embeddings = np.array(all_embeddings)
+                print(f"Embeddings computed. Shape: {self.doc_embeddings.shape}")
+                
+                # Normalize if requested
+                if normalize_embeddings:
+                    norms = np.linalg.norm(self.doc_embeddings, axis=1, keepdims=True)
+                    norms = np.where(norms == 0, 1, norms)  # Avoid division by zero
+                    self.doc_embeddings = self.doc_embeddings / norms
+                
+                # Save embeddings cache if enabled
+                if self.cache_embeddings and self.embeddings_dir:
+                    self._save_cached_embeddings(model_name, dimensions)
+                
+                # Mark embeddings as loaded and set model to None for API mode
+                embeddings_loaded = True
+                self.model = None  # No local model needed in API mode
+                
+            else:
+                # This should never happen if use_api is correctly set
+                raise ValueError(
+                    "Local model mode is not supported. Please use OpenAI API mode by providing api_key."
                 )
-            
-            self.model = SentenceTransformer(model_name, device=device)
-            self.normalize_embeddings = normalize_embeddings
-            
-            # Pre-compute document embeddings
-            texts = [doc.text for doc in self.candidates]
-            print(f"Computing embeddings for {len(texts)} documents using local model...")
-            self.doc_embeddings = self.model.encode(
-                texts,
-                show_progress_bar=True,
-                normalize_embeddings=normalize_embeddings,
-            )
-            # Convert to numpy array for efficient computation
-            self.doc_embeddings = np.array(self.doc_embeddings)
-            print(f"Embeddings computed. Shape: {self.doc_embeddings.shape}")
+        
+        # Build HNSW index if needed (and not already loaded)
+        if self.use_hnsw and not index_loaded:
+            if self.doc_embeddings is not None:
+                # We have embeddings, build index
+                self._build_hnsw_index()
+            else:
+                print("  ⚠ Cannot build HNSW index: embeddings not available")
+                print("     Falling back to linear search.")
+                self.use_hnsw = False
+        elif not self.use_hnsw:
+            if use_hnsw and hnswlib is None:
+                print("  ⚠ HNSW library not available. Install with: pip install hnswlib")
+                print("     Falling back to linear search.")
+    
+    def _get_embeddings_cache_path(self, model_name: str, dimensions: int | None, num_docs: int) -> Path | None:
+        """Generate embeddings cache file path."""
+        if not self.embeddings_dir:
+            return None
+        
+        self.embeddings_dir.mkdir(parents=True, exist_ok=True)
+        
+        dim_str = str(dimensions) if dimensions else "default"
+        model_str = model_name.replace("/", "_").replace("-", "_")
+        cache_filename = f"embeddings_{model_str}_dim{dim_str}_{num_docs}.npy"
+        return self.embeddings_dir / cache_filename
+    
+    def _load_cached_embeddings(self, model_name: str, dimensions: int | None, num_docs: int) -> np.ndarray | None:
+        """Load cached embeddings from disk if available."""
+        cache_path = self._get_embeddings_cache_path(model_name, dimensions, num_docs)
+        if cache_path and cache_path.exists():
+            try:
+                print(f"  Loading cached embeddings from: {cache_path.name}")
+                embeddings = np.load(str(cache_path))
+                print(f"  ✓ Cached embeddings loaded successfully")
+                return embeddings
+            except Exception as e:
+                print(f"  ⚠ Failed to load cached embeddings: {e}")
+                print(f"     Will compute new embeddings.")
+        return None
+    
+    def _save_cached_embeddings(self, model_name: str, dimensions: int | None) -> None:
+        """Save embeddings to disk cache."""
+        if not hasattr(self, 'doc_embeddings') or self.doc_embeddings is None:
+            return
+        
+        cache_path = self._get_embeddings_cache_path(model_name, dimensions, len(self.candidates))
+        if cache_path:
+            try:
+                np.save(str(cache_path), self.doc_embeddings)
+                cache_size_mb = cache_path.stat().st_size / (1024 * 1024)
+                print(f"  ✓ Saved embeddings cache: {cache_path.name} ({cache_size_mb:.2f} MB)")
+            except Exception as e:
+                print(f"  ⚠ Failed to save embeddings cache: {e}")
+    
+    def _get_index_path(self, model_name: str, dimensions: int | None, num_docs: int) -> Path | None:
+        """Generate HNSW index file path."""
+        if not self.index_dir:
+            return None
+        
+        dim_str = str(dimensions) if dimensions else "default"
+        model_str = model_name.replace("/", "_").replace("-", "_")
+        index_filename = f"hnsw_{model_str}_dim{dim_str}_{num_docs}.index"
+        return self.index_dir / index_filename
+    
+    def _build_hnsw_index(self) -> None:
+        """Build HNSW index from embeddings and save to disk."""
+        if self.doc_embeddings is None:
+            raise ValueError("Cannot build index: embeddings not available")
+        
+        dimension = self.doc_embeddings.shape[1]
+        num_docs = len(self.doc_embeddings)
+        
+        print(f"  Building HNSW index...")
+        print(f"    Dimension: {dimension}")
+        print(f"    Documents: {num_docs}")
+        print(f"    M: {self.hnsw_m}, ef_construction: {self.hnsw_ef_construction}, ef_search: {self.hnsw_ef_search}")
+        
+        # Convert embeddings to float32 (required by hnswlib)
+        embeddings_f32 = self.doc_embeddings.astype('float32')
+        
+        # Normalize embeddings if needed (hnswlib 'cosine' space requires normalized vectors)
+        if self.normalize_embeddings:
+            # Normalize each vector
+            norms = np.linalg.norm(embeddings_f32, axis=1, keepdims=True)
+            norms = np.where(norms == 0, 1, norms)  # Avoid division by zero
+            embeddings_f32 = embeddings_f32 / norms
+        
+        # Create HNSW index
+        # Use 'cosine' space if embeddings are normalized, 'l2' otherwise
+        space = 'cosine' if self.normalize_embeddings else 'l2'
+        self.hnsw_index = hnswlib.Index(space=space, dim=dimension)
+        
+        # Initialize index with parameters
+        self.hnsw_index.init_index(max_elements=num_docs, M=self.hnsw_m, ef_construction=self.hnsw_ef_construction)
+        
+        # Add vectors to index (with IDs 0, 1, 2, ...)
+        self.hnsw_index.add_items(embeddings_f32, np.arange(num_docs))
+        
+        # Set ef_search for query time
+        self.hnsw_index.set_ef(self.hnsw_ef_search)
+        
+        print(f"  ✓ HNSW index built successfully")
+        
+        # Save index
+        # Use explicit path if provided, otherwise generate from directory
+        if self.index_path is not None:
+            save_path = self.index_path
+        else:
+            save_path = self._get_index_path(self.model_name, self.dimensions, num_docs)
+        
+        if save_path:
+            try:
+                self.hnsw_index.save_index(str(save_path))
+                print(f"  ✓ HNSW index saved to: {save_path.name}")
+            except Exception as e:
+                print(f"  ⚠ Failed to save index: {e}")
     
     def search(self, query: str, top_k: int = 10) -> List[Tuple[Candidates, float]]:
         """
@@ -541,34 +760,67 @@ class VectorRetriever:
                 if norm > 0:
                     query_embedding = query_embedding / norm
         else:
-            # Use local model
-            query_embedding = self.model.encode(
-                query,
-                normalize_embeddings=self.normalize_embeddings,
-            )
-            query_embedding = np.array(query_embedding)
+            # This should never happen - API mode is required
+            raise ValueError("Local model mode is not supported. API mode is required.")
         
-        # Compute similarity scores (cosine similarity if normalized, dot product otherwise)
-        if self.normalize_embeddings:
-            # Cosine similarity = dot product when embeddings are normalized
-            scores = np.dot(self.doc_embeddings, query_embedding)
+        # Use HNSW index if available, otherwise use linear search
+        if self.use_hnsw and self.hnsw_index is not None:
+            # Use HNSW index for fast search
+            query_vec = query_embedding.astype('float32')
+            
+            # Normalize query vector if using normalized embeddings (for cosine similarity)
+            if self.normalize_embeddings:
+                norm = np.linalg.norm(query_vec)
+                if norm > 0:
+                    query_vec = query_vec / norm
+            
+            # Search using HNSW
+            labels, distances = self.hnsw_index.knn_query(query_vec, k=top_k)
+            
+            # Convert distances to similarity scores
+            # For cosine similarity: distance = 1 - similarity, so similarity = 1 - distance
+            # For L2 distance: convert to similarity using 1 / (1 + distance)
+            results: List[Tuple[Candidates, float]] = []
+            for idx, dist in zip(labels[0], distances[0]):
+                if idx < 0 or idx >= len(self.candidates):
+                    continue  # Skip invalid indices
+                
+                if self.normalize_embeddings:
+                    # Cosine distance: convert to similarity (1 - distance)
+                    # Note: hnswlib returns cosine distance (0 = same, 2 = opposite)
+                    score = float(1.0 - dist)  # Convert distance to similarity
+                else:
+                    # Convert L2 distance to similarity (higher is better)
+                    # Use 1 / (1 + distance) to ensure score is in [0, 1] range
+                    score = float(1.0 / (1.0 + dist))
+                
+                if score > 0:  # Only include positive similarity scores
+                    results.append((self.candidates[idx], score))
+            
+            return results
         else:
-            # Use cosine similarity manually
-            query_norm = np.linalg.norm(query_embedding)
-            doc_norms = np.linalg.norm(self.doc_embeddings, axis=1)
-            scores = np.dot(self.doc_embeddings, query_embedding) / (doc_norms * query_norm)
-        
-        # Get top-k indices
-        top_indices = np.argsort(scores)[::-1][:top_k]
-        
-        # Filter out negative scores (or low similarity)
-        results: List[Tuple[Candidates, float]] = []
-        for idx in top_indices:
-            score = float(scores[idx])
-            if score > 0:  # Only include positive similarity scores
-                results.append((self.candidates[idx], score))
-        
-        return results
+            # Fallback to linear search
+            # Compute similarity scores (cosine similarity if normalized, dot product otherwise)
+            if self.normalize_embeddings:
+                # Cosine similarity = dot product when embeddings are normalized
+                scores = np.dot(self.doc_embeddings, query_embedding)
+            else:
+                # Use cosine similarity manually
+                query_norm = np.linalg.norm(query_embedding)
+                doc_norms = np.linalg.norm(self.doc_embeddings, axis=1)
+                scores = np.dot(self.doc_embeddings, query_embedding) / (doc_norms * query_norm)
+            
+            # Get top-k indices
+            top_indices = np.argsort(scores)[::-1][:top_k]
+            
+            # Filter out negative scores (or low similarity)
+            results: List[Tuple[Candidates, float]] = []
+            for idx in top_indices:
+                score = float(scores[idx])
+                if score > 0:  # Only include positive similarity scores
+                    results.append((self.candidates[idx], score))
+            
+            return results
 
 
 def load_food_candidates_for_vector(csv_path: Path) -> List[Candidates]:
@@ -582,121 +834,341 @@ def load_food_candidates_for_vector(csv_path: Path) -> List[Candidates]:
 
 def demonstrate_sample_query(
     data_dir: Path,
-    use_openai_api: bool = False,
-    api_base: str | None = None,
-    api_key: str | None = None,
-    dimensions: int | None = None,
+    use_openai_api: bool,
+    api_base: str,
+    api_key: str,
+    dimensions: int,
+    index_path: Path | str,
+    model_name: str,
+    max_tokens_per_request: int,
+    max_items_per_batch: int | None,
+    rpm_limit: int,
+    timeout: float,
+    normalize_embeddings: bool,
+    use_hnsw: bool,
+    hnsw_m: int,
+    hnsw_ef_construction: int,
+    hnsw_ef_search: int,
+    embeddings_dir: Path | str | None,
+    cache_embeddings: bool,
 ) -> None:
-    """
-    Demonstrate vector retrieval with a sample query.
-    
-    Args:
-        data_dir: Directory containing data files
-        use_openai_api: If True, use OpenAI API; if False, use local SentenceTransformer model
-        api_base: API base URL (required if use_openai_api=True)
-        api_key: API key (required if use_openai_api=True)
-        dimensions: Optional number of dimensions for output embeddings.
-            Only supported in text-embedding-3 and later models.
-            If None, uses model's default dimensions.
-    """
+
     items_path = data_dir / "500_items.csv"
     queries_path = data_dir / "10_queries.csv"
 
-    print("Loading candidates...")
-    candidates = load_food_candidates_for_vector(items_path)
+    print("=" * 80)
+    print("Vector Retrieval with HNSW Index Demo")
+    print("=" * 80)
     
-    print("Initializing vector retriever...")
-    if use_openai_api:
-        if not api_key:
-            raise ValueError("api_key is required when use_openai_api=True")
-        
-        # Use standard OpenAI API if api_base not provided
-        if not api_base:
-            api_base = "https://api.openai.com/v1"
-            print(f"  Using standard OpenAI API: {api_base}")
-        else:
-            print(f"  Using custom API: {api_base}")
-        
-        print(f"  Model: text-embedding-3-small")
-        if dimensions is not None:
-            print(f"  Dimensions: {dimensions}")
-        else:
-            print(f"  Dimensions: default (model-dependent)")
-        # text-embedding-3-small supports up to 8191 tokens per input
-        # For batch requests, use a conservative limit
-        retriever = VectorRetriever(
-            candidates,
-            api_base=api_base,
-            api_key=api_key,
-            model_name="text-embedding-3-small",
-            max_tokens_per_request=8192,  # Conservative limit for batch processing
-            max_items_per_batch=100,  # Limit items per batch to avoid server issues
-            rpm_limit=500,  # OpenAI default is higher, but use conservative limit
-            dimensions=dimensions,  # Pass dimensions parameter
-        )
+    # Validate all required parameters - no defaults allowed
+    if not use_openai_api:
+        raise ValueError("use_openai_api must be True. Local model mode is not supported.")
+    
+    if not api_key:
+        raise ValueError("api_key is required and must be provided explicitly.")
+    
+    if not api_base:
+        raise ValueError("api_base is required and must be provided explicitly (e.g., 'https://api.openai.com/v1').")
+    
+    if index_path is None:
+        raise ValueError("index_path is required and must be provided explicitly.")
+    
+    if not model_name:
+        raise ValueError("model_name is required and must be provided explicitly (e.g., 'text-embedding-3-small').")
+    
+    if dimensions is None or dimensions <= 0:
+        raise ValueError("dimensions is required and must be a positive integer (e.g., 1536 for text-embedding-3-small).")
+    
+    print("\n1. Loading candidates...")
+    candidates = load_food_candidates_for_vector(items_path)
+    print(f"   ✓ Loaded {len(candidates)} candidates")
+    
+    print("\n2. Index path: ", end="")
+    index_path_obj = Path(index_path)
+    if index_path_obj.is_dir():
+        index_path_obj.mkdir(parents=True, exist_ok=True)
+        # Generate expected index filename
+        dim_str = str(dimensions)
+        num_docs = len(candidates)
+        expected_index_name = f"hnsw_{model_name.replace('/', '_').replace('-', '_')}_dim{dim_str}_{num_docs}.index"
+        expected_index_path = index_path_obj / expected_index_name
+        print(f"{index_path_obj} (will use: {expected_index_name})")
     else:
-        print("  Using local SentenceTransformer model")
-        retriever = VectorRetriever(
-            candidates,
-            model_name="paraphrase-multilingual-MiniLM-L12-v2"
-        )
+        # It's a file path
+        expected_index_path = index_path_obj
+        print(f"{index_path_obj}")
+    
+    if expected_index_path.exists():
+        print(f"   ✓ Found existing index: {expected_index_path.name}")
+        print(f"     This index will be automatically loaded!")
+    else:
+        print(f"   ⚠ No existing index found. Will build new index and save it.")
+    
+    print("\n3. Initializing vector retriever...")
+    print("   (This will compute embeddings and build/load HNSW index)")
+    print(f"   Using API: {api_base}")
+    print(f"   Model: {model_name}")
+    print(f"   Dimensions: {dimensions}")
+    
+    # Determine embeddings directory
+    if embeddings_dir is None:
+        if index_path_obj.is_file():
+            embeddings_dir = index_path_obj.parent
+        else:
+            embeddings_dir = index_path_obj
+    
+    retriever = VectorRetriever(
+        candidates,
+        api_base=api_base,
+        api_key=api_key,
+        model_name=model_name,
+        max_tokens_per_request=max_tokens_per_request,
+        max_items_per_batch=max_items_per_batch,
+        rpm_limit=rpm_limit,
+        timeout=timeout,
+        dimensions=dimensions,
+        normalize_embeddings=normalize_embeddings,
+        # HNSW indexing parameters
+        use_hnsw=use_hnsw,
+        index_path=index_path_obj,
+        hnsw_m=hnsw_m,
+        hnsw_ef_construction=hnsw_ef_construction,
+        hnsw_ef_search=hnsw_ef_search,
+        # Embeddings caching parameters
+        embeddings_dir=Path(embeddings_dir) if embeddings_dir else None,
+        cache_embeddings=cache_embeddings,
+    )
 
+    print("\n4. Performing search...")
     with queries_path.open(newline="", encoding="utf-8") as f:
         reader = csv.DictReader(f)
         first_row = next(reader)
 
     query = first_row["search_term_pt"]
-    print(f"\nQuery: {query}")
+    print(f"   Query: {query}")
     
+    import time
+    start_time = time.time()
     results = retriever.search(query, top_k=5)
+    search_time = (time.time() - start_time) * 1000  # Convert to milliseconds
     
-    print("\nTop-5 results:")
+    print(f"\n5. Search Results (search time: {search_time:.2f}ms):")
+    print("-" * 80)
     for rank, (doc, score) in enumerate(results, start=1):
-        print(f"{rank}. score={score:.4f} itemId={doc.id} name={doc.name}")
+        name = doc.name[:60] + "..." if len(doc.name) > 60 else doc.name
+        print(f"   {rank}. score={score:.4f} | itemId={doc.id}")
+        print(f"      name: {name}")
+    
+    print("\n" + "=" * 80)
+    print("Summary:")
+    print("=" * 80)
+    # Get actual index path (either explicit or generated)
+    if retriever.index_path is not None:
+        actual_index_path = retriever.index_path
+    else:
+        actual_index_path = retriever._get_index_path(model_name, dimensions, len(candidates))
+    
+    if actual_index_path:
+        print(f"  • Index location: {actual_index_path}")
+        if actual_index_path.exists():
+            index_size_mb = actual_index_path.stat().st_size / (1024 * 1024)
+            print(f"  • Index size: {index_size_mb:.2f} MB")
+    
+    # Show embeddings cache info
+    if retriever.embeddings_dir:
+        cache_path = retriever._get_embeddings_cache_path(
+            model_name, dimensions, len(candidates)
+        )
+        if cache_path and cache_path.exists():
+            cache_size_mb = cache_path.stat().st_size / (1024 * 1024)
+            print(f"  • Embeddings cache: {cache_path.name} ({cache_size_mb:.2f} MB)")
+    
+    print(f"  • Search method: {'HNSW (fast)' if retriever.use_hnsw else 'Linear search (slow)'}")
+    print(f"  • Search time: {search_time:.2f}ms")
+    print(f"\n💡 Tip: Next time you run this script:")
+    print(f"   • Embeddings will be loaded from cache (no API calls needed!)")
+    print(f"   • HNSW index will be loaded automatically")
+    print(f"   • Only query embeddings will be computed - super fast! 🚀")
+    print("=" * 80)
 
 
 if __name__ == "__main__":
     project_root = Path(__file__).resolve().parents[1]
     
+    # All parameters must be explicitly set - no defaults or auto-detection
+    print("=" * 80)
+    print("HNSW Vector Database Demo")
+    print("=" * 80)
+    print("\n⚠️  All parameters must be explicitly provided. No defaults will be used.")
+    print("=" * 80 + "\n")
+    
     # Get API key from .env file or environment variable
     api_key = os.getenv("OPENAI_API_KEY")
-    
     if not api_key:
-        print("=" * 70)
-        print("ERROR: OPENAI_API_KEY not found!")
-        print("=" * 70)
-        print("Please set your OpenAI API key in one of the following ways:")
-        print("\n1. Create a .env file in the project root with:")
-        print("   OPENAI_API_KEY=sk-your-key-here")
-        print("\n2. Or set environment variable:")
-        print("   export OPENAI_API_KEY='sk-your-key-here'")
-        print("\n3. Install python-dotenv if you want to use .env file:")
-        print("   pip install python-dotenv")
-        print("=" * 70)
-        exit(1)
+        raise ValueError(
+            "OPENAI_API_KEY is required. Set it in .env file or environment variable."
+        )
     
-    # Get optional API base from .env file or environment variable
+    # Get API base from .env file or environment variable
     api_base = os.getenv("OPENAI_API_BASE")
-    if api_base and api_base.strip():
-        api_base = api_base.strip()
-    else:
-        api_base = None  # None means use standard OpenAI API
+    if not api_base or not api_base.strip():
+        raise ValueError(
+            "OPENAI_API_BASE is required. Set it in .env file or environment variable (e.g., 'https://api.openai.com/v1')."
+        )
+    api_base = api_base.strip()
     
-    # Get optional dimensions from .env file or environment variable
+    # Get model name from environment variable
+    model_name = os.getenv("OPENAI_EMBEDDING_MODEL")
+    if not model_name or not model_name.strip():
+        raise ValueError(
+            "OPENAI_EMBEDDING_MODEL is required. Set it in .env file or environment variable (e.g., 'text-embedding-3-small')."
+        )
+    model_name = model_name.strip()
+    
+    # Get dimensions from environment variable
     dimensions_str = os.getenv("OPENAI_EMBEDDING_DIMENSIONS")
-    dimensions = None
-    if dimensions_str and dimensions_str.strip():
-        try:
-            dimensions = int(dimensions_str.strip())
-        except ValueError:
-            print(f"Warning: Invalid OPENAI_EMBEDDING_DIMENSIONS value '{dimensions_str}', ignoring.")
+    if not dimensions_str or not dimensions_str.strip():
+        raise ValueError(
+            "OPENAI_EMBEDDING_DIMENSIONS is required. Set it in .env file or environment variable (e.g., '1536' for text-embedding-3-small)."
+        )
+    try:
+        dimensions = int(dimensions_str.strip())
+        if dimensions <= 0:
+            raise ValueError(f"dimensions must be positive, got {dimensions}")
+    except ValueError as e:
+        raise ValueError(f"Invalid OPENAI_EMBEDDING_DIMENSIONS value '{dimensions_str}': {e}")
     
-    # Use standard OpenAI API
+    # Get index path from environment variable
+    index_path_str = os.getenv("VECTOR_INDEX_PATH")
+    if not index_path_str or not index_path_str.strip():
+        raise ValueError(
+            "VECTOR_INDEX_PATH is required. Set it in .env file or environment variable (e.g., 'artifacts/vector_indices')."
+        )
+    index_path = project_root / index_path_str.strip()
+    
+    print("\nConfiguration:")
+    print(f"  • API Base: {api_base}")
+    print(f"  • Model: {model_name}")
+    print(f"  • Dimensions: {dimensions}")
+    print(f"  • Index Path: {index_path}")
+    print("=" * 80 + "\n")
+    
+    # Get all other required parameters from environment variables
+    max_tokens_per_request_str = os.getenv("MAX_TOKENS_PER_REQUEST")
+    if not max_tokens_per_request_str or not max_tokens_per_request_str.strip():
+        raise ValueError(
+            "MAX_TOKENS_PER_REQUEST is required. Set it in .env file or environment variable (e.g., '8192')."
+        )
+    try:
+        max_tokens_per_request = int(max_tokens_per_request_str.strip())
+        if max_tokens_per_request <= 0:
+            raise ValueError(f"max_tokens_per_request must be positive, got {max_tokens_per_request}")
+    except ValueError as e:
+        raise ValueError(f"Invalid MAX_TOKENS_PER_REQUEST value '{max_tokens_per_request_str}': {e}")
+    
+    max_items_per_batch_str = os.getenv("MAX_ITEMS_PER_BATCH")
+    max_items_per_batch = None
+    if max_items_per_batch_str and max_items_per_batch_str.strip():
+        try:
+            max_items_per_batch = int(max_items_per_batch_str.strip())
+            if max_items_per_batch <= 0:
+                raise ValueError(f"max_items_per_batch must be positive, got {max_items_per_batch}")
+        except ValueError as e:
+            raise ValueError(f"Invalid MAX_ITEMS_PER_BATCH value '{max_items_per_batch_str}': {e}")
+    
+    rpm_limit_str = os.getenv("RPM_LIMIT")
+    if not rpm_limit_str or not rpm_limit_str.strip():
+        raise ValueError(
+            "RPM_LIMIT is required. Set it in .env file or environment variable (e.g., '300')."
+        )
+    try:
+        rpm_limit = int(rpm_limit_str.strip())
+        if rpm_limit <= 0:
+            raise ValueError(f"rpm_limit must be positive, got {rpm_limit}")
+    except ValueError as e:
+        raise ValueError(f"Invalid RPM_LIMIT value '{rpm_limit_str}': {e}")
+    
+    timeout_str = os.getenv("TIMEOUT")
+    if not timeout_str or not timeout_str.strip():
+        raise ValueError(
+            "TIMEOUT is required. Set it in .env file or environment variable (e.g., '120.0')."
+        )
+    try:
+        timeout = float(timeout_str.strip())
+        if timeout <= 0:
+            raise ValueError(f"timeout must be positive, got {timeout}")
+    except ValueError as e:
+        raise ValueError(f"Invalid TIMEOUT value '{timeout_str}': {e}")
+    
+    normalize_embeddings_str = os.getenv("NORMALIZE_EMBEDDINGS", "True").strip().lower()
+    normalize_embeddings = normalize_embeddings_str in ("true", "1", "yes")
+    
+    use_hnsw_str = os.getenv("USE_HNSW", "True").strip().lower()
+    use_hnsw = use_hnsw_str in ("true", "1", "yes")
+    
+    hnsw_m_str = os.getenv("HNSW_M")
+    if not hnsw_m_str or not hnsw_m_str.strip():
+        raise ValueError(
+            "HNSW_M is required. Set it in .env file or environment variable (e.g., '32')."
+        )
+    try:
+        hnsw_m = int(hnsw_m_str.strip())
+        if hnsw_m <= 0:
+            raise ValueError(f"hnsw_m must be positive, got {hnsw_m}")
+    except ValueError as e:
+        raise ValueError(f"Invalid HNSW_M value '{hnsw_m_str}': {e}")
+    
+    hnsw_ef_construction_str = os.getenv("HNSW_EF_CONSTRUCTION")
+    if not hnsw_ef_construction_str or not hnsw_ef_construction_str.strip():
+        raise ValueError(
+            "HNSW_EF_CONSTRUCTION is required. Set it in .env file or environment variable (e.g., '100')."
+        )
+    try:
+        hnsw_ef_construction = int(hnsw_ef_construction_str.strip())
+        if hnsw_ef_construction <= 0:
+            raise ValueError(f"hnsw_ef_construction must be positive, got {hnsw_ef_construction}")
+    except ValueError as e:
+        raise ValueError(f"Invalid HNSW_EF_CONSTRUCTION value '{hnsw_ef_construction_str}': {e}")
+    
+    hnsw_ef_search_str = os.getenv("HNSW_EF_SEARCH")
+    if not hnsw_ef_search_str or not hnsw_ef_search_str.strip():
+        raise ValueError(
+            "HNSW_EF_SEARCH is required. Set it in .env file or environment variable (e.g., '64')."
+        )
+    try:
+        hnsw_ef_search = int(hnsw_ef_search_str.strip())
+        if hnsw_ef_search <= 0:
+            raise ValueError(f"hnsw_ef_search must be positive, got {hnsw_ef_search}")
+    except ValueError as e:
+        raise ValueError(f"Invalid HNSW_EF_SEARCH value '{hnsw_ef_search_str}': {e}")
+    
+    embeddings_dir_str = os.getenv("EMBEDDINGS_DIR")
+    embeddings_dir = None
+    if embeddings_dir_str and embeddings_dir_str.strip():
+        embeddings_dir = project_root / embeddings_dir_str.strip()
+    
+    cache_embeddings_str = os.getenv("CACHE_EMBEDDINGS", "True").strip().lower()
+    cache_embeddings = cache_embeddings_str in ("true", "1", "yes")
+    
+    # Call demonstrate_sample_query with all required parameters
     demonstrate_sample_query(
-        project_root / "data" / "test",
+        data_dir=project_root / "data" / "test",
         use_openai_api=True,
-        api_base=api_base,  # None means use standard OpenAI API
+        api_base=api_base,
         api_key=api_key,
-        dimensions=dimensions,  # Pass dimensions if specified
+        dimensions=dimensions,
+        index_path=index_path,
+        model_name=model_name,
+        max_tokens_per_request=max_tokens_per_request,
+        max_items_per_batch=max_items_per_batch,
+        rpm_limit=rpm_limit,
+        timeout=timeout,
+        normalize_embeddings=normalize_embeddings,
+        use_hnsw=use_hnsw,
+        hnsw_m=hnsw_m,
+        hnsw_ef_construction=hnsw_ef_construction,
+        hnsw_ef_search=hnsw_ef_search,
+        embeddings_dir=embeddings_dir,
+        cache_embeddings=cache_embeddings,
     )
 
