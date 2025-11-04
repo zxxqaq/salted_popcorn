@@ -201,6 +201,14 @@ def main():
     except ValueError as e:
         raise ValueError(f"Invalid LLM_TOKENS_PER_ITEM_OUTPUT value '{llm_tokens_per_item_output_str}': {e}")
     
+    llm_rerank_batch_size_str = os.getenv("LLM_RERANK_BATCH_SIZE", "10").strip()
+    try:
+        llm_rerank_batch_size = int(llm_rerank_batch_size_str)
+        if llm_rerank_batch_size <= 0:
+            raise ValueError(f"llm_rerank_batch_size must be positive, got {llm_rerank_batch_size}")
+    except ValueError as e:
+        raise ValueError(f"Invalid LLM_RERANK_BATCH_SIZE value '{llm_rerank_batch_size_str}': {e}")
+    
     llm_sleep_str = os.getenv("LLM_SLEEP", "0.0").strip()
     try:
         llm_sleep = float(llm_sleep_str)
@@ -423,17 +431,42 @@ def main():
     except ValueError as e:
         raise ValueError(f"Invalid FINAL_TOP_K_2 value '{final_top_k_2_str}': {e}")
     
+    # Two-stage re-ranking parameters (optional)
+    use_two_stage_reranking_str = os.getenv("USE_TWO_STAGE_RERANKING", "False").strip().lower()
+    use_two_stage_reranking = use_two_stage_reranking_str in ("true", "1", "yes")
+    
+    lightweight_reranker_model = os.getenv("LIGHTWEIGHT_RERANKER_MODEL")
+    if use_two_stage_reranking and (not lightweight_reranker_model or not lightweight_reranker_model.strip()):
+        raise ValueError(
+            "LIGHTWEIGHT_RERANKER_MODEL is required when USE_TWO_STAGE_RERANKING=True. "
+            "Set it in .env file (e.g., 'BAAI/bge-reranker-base' or 'BAAI/bge-reranker-large' or 'BAAI/bge-reranker-v2-m3')."
+        )
+    if lightweight_reranker_model:
+        lightweight_reranker_model = lightweight_reranker_model.strip()
+    
+    lightweight_reranker_top_k_str = os.getenv("LIGHTWEIGHT_RERANKER_TOP_K", "20").strip()
+    try:
+        lightweight_reranker_top_k = int(lightweight_reranker_top_k_str)
+        if lightweight_reranker_top_k <= 0:
+            raise ValueError(f"lightweight_reranker_top_k must be positive, got {lightweight_reranker_top_k}")
+    except ValueError as e:
+        raise ValueError(f"Invalid LIGHTWEIGHT_RERANKER_TOP_K value '{lightweight_reranker_top_k_str}': {e}")
+    
     # Initialize hybrid retriever
     print("\nInitializing hybrid retriever...")
     print(f"  • BM25: k1={bm25_k1}, b={bm25_b}")
     print(f"  • Vector: {vector_model_name} (dim={vector_dimensions})")
-    print(f"  • LLM: {llm_model} for re-ranking")
+    print(f"  • LLM: {llm_model} for re-ranking (batch_size={llm_rerank_batch_size})")
     print(f"  • Retrieval: top-{retrieval_top_k} from each method")
     if use_rrf:
         print(f"  • RRF Fusion: enabled (k={rrf_k}, top-{rrf_top_k})")
     else:
         print(f"  • RRF Fusion: disabled (simple merge)")
     print(f"  • Final output: top-{final_top_k_1} and top-{final_top_k_2}")
+    if use_two_stage_reranking:
+        print(f"  • Two-stage re-ranking: enabled ({lightweight_reranker_model}, {rrf_top_k} → {lightweight_reranker_top_k} → LLM)")
+    else:
+        print(f"  • Two-stage re-ranking: disabled (direct LLM re-ranking)")
     print(f"  • HNSW Index: {vector_hnsw_index_path.name}")
     
     retriever = HybridRetriever(
@@ -446,6 +479,7 @@ def main():
         llm_max_context_tokens=llm_max_context_tokens,
         llm_reserved_output_tokens=llm_reserved_output_tokens,
         llm_tokens_per_item_output=llm_tokens_per_item_output,
+        llm_rerank_batch_size=llm_rerank_batch_size,
         llm_sleep=llm_sleep,
         llm_timeout=llm_timeout,
         # BM25 parameters (required)
@@ -477,6 +511,10 @@ def main():
         # Final output parameters (required)
         final_top_k_1=final_top_k_1,
         final_top_k_2=final_top_k_2,
+        # Two-stage re-ranking parameters (optional)
+        use_two_stage_reranking=use_two_stage_reranking,
+        lightweight_reranker_model=lightweight_reranker_model,
+        lightweight_reranker_top_k=lightweight_reranker_top_k,
     )
     print("  ✓ Hybrid retriever initialized")
     

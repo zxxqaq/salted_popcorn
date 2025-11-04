@@ -17,6 +17,7 @@ import json
 import logging
 import os
 import time
+from concurrent.futures import ThreadPoolExecutor, as_completed
 from dataclasses import dataclass
 from pathlib import Path
 from typing import Dict, List, Sequence, Tuple
@@ -45,6 +46,14 @@ if str(REPO_ROOT) not in sys.path:
 
 from src.bm25_retrieval import BM25Retriever, Candidates, build_candidate_text
 from src.vector_retrieval import VectorRetriever
+
+# Optional lightweight reranker for two-stage re-ranking
+try:
+    from src.reranker import LightweightReranker
+    RERANKER_AVAILABLE = True
+except ImportError:
+    RERANKER_AVAILABLE = False
+    LightweightReranker = None
 
 LOGGER = logging.getLogger("hybrid_retrieval")
 
@@ -77,6 +86,7 @@ class HybridRetriever:
         llm_max_context_tokens: int,
         llm_reserved_output_tokens: int,
         llm_tokens_per_item_output: int,
+        llm_rerank_batch_size: int,  # Fixed batch size for LLM re-ranking (e.g., 10 items per batch)
         llm_sleep: float,
         llm_timeout: float,
         # BM25 parameters (required)
@@ -104,10 +114,14 @@ class HybridRetriever:
         # RRF fusion parameters (required)
         use_rrf: bool,  # Whether to use RRF fusion before LLM re-ranking
         rrf_k: int,  # RRF constant k (typically 60)
-        rrf_top_k: int,  # Top-K results after RRF fusion (input to LLM)
+        rrf_top_k: int,  # Top-K results after RRF fusion (input to lightweight reranker or LLM)
         # Final output parameters (required)
         final_top_k_1: int,  # First top-K result set (e.g., top-5)
         final_top_k_2: int,  # Second top-K result set (e.g., top-10)
+        # Two-stage re-ranking parameters (optional, must come after required parameters)
+        use_two_stage_reranking: bool = False,  # Whether to use two-stage re-ranking
+        lightweight_reranker_model: str | None = None,  # Model name for lightweight reranker (e.g., "BAAI/bge-reranker-base")
+        lightweight_reranker_top_k: int = 20,  # Top-K after first-stage reranker (input to LLM)
     ) -> None:
         """
         Initialize hybrid retriever.
@@ -123,6 +137,7 @@ class HybridRetriever:
             llm_max_context_tokens: Maximum context window tokens for the model (required)
             llm_reserved_output_tokens: Base reserved tokens for LLM response output (required)
             llm_tokens_per_item_output: Estimated tokens per item in output JSON (required)
+            llm_rerank_batch_size: Fixed batch size for LLM re-ranking (required, e.g., 10 items per batch)
             llm_sleep: Sleep time between LLM requests (required)
             llm_timeout: LLM request timeout (required)
             bm25_k1: BM25 k1 parameter (required)
@@ -207,8 +222,39 @@ class HybridRetriever:
         self.llm_max_context_tokens = llm_max_context_tokens
         self.llm_reserved_output_tokens = llm_reserved_output_tokens
         self.llm_tokens_per_item_output = llm_tokens_per_item_output
+        self.llm_rerank_batch_size = llm_rerank_batch_size
         self.llm_sleep = llm_sleep
         self.llm_timeout = llm_timeout
+        
+        # Two-stage re-ranking parameters
+        self.use_two_stage_reranking = use_two_stage_reranking
+        self.lightweight_reranker_top_k = lightweight_reranker_top_k
+        self.lightweight_reranker = None
+        
+        # Initialize lightweight reranker if two-stage re-ranking is enabled
+        if use_two_stage_reranking:
+            if not RERANKER_AVAILABLE:
+                raise ImportError(
+                    "Lightweight reranker is required for two-stage re-ranking. "
+                    "Install with: pip install FlagEmbedding"
+                )
+            if not lightweight_reranker_model:
+                raise ValueError(
+                    "lightweight_reranker_model is required when use_two_stage_reranking=True"
+                )
+            try:
+                self.lightweight_reranker = LightweightReranker(
+                    model_name=lightweight_reranker_model,
+                    use_api=False,  # Use local model by default
+                )
+                LOGGER.info(
+                    "Initialized lightweight reranker: %s (first-stage top-K: %d)",
+                    lightweight_reranker_model, lightweight_reranker_top_k
+                )
+            except Exception as e:
+                raise RuntimeError(
+                    f"Failed to initialize lightweight reranker: {e}"
+                ) from e
     
     def _merge_and_deduplicate(
         self,
@@ -358,43 +404,14 @@ class HybridRetriever:
         else:
             items_list = "(no items)"
         
-        prompt = f"""You are a ranking assistant for food search. Score each candidate item for relevance to the user query.
+        prompt = f"""You are a ranking assistant for food search. Score each item (0-10) for relevance to: {query}
 
-Query: {query}
-
-Candidates (total: {len(items)} items):
+Candidates:
 {items_list}
 
-Scoring (integer 0-10):
-- 10: Perfect match
-- 8-9: Highly relevant
-- 6-7: Somewhat relevant
-- 4-5: Marginally relevant
-- 2-3: Barely relevant
-- 0-1: Unrelated
-
-Guidelines:
-- Use the FULL range (0-10). Don't cluster scores.
-- Items with ANY connection should get 2+.
-- Only use 0-1 for completely unrelated items.
-- Distribute scores across the range.
-
-CRITICAL REQUIREMENTS:
-1. You MUST return a JSON array with EXACTLY {len(items)} items.
-2. Each item in the candidates list above MUST appear exactly once in your response.
-3. Do NOT skip any items. Do NOT stop early.
-4. Each item must have "item_id" and "score" fields.
-5. Count your output items to ensure you have {len(items)} items before finishing.
-
-Return ONLY a valid JSON array in this exact format:
-[
-  {{"item_id": "item_001", "score": 8}},
-  {{"item_id": "item_002", "score": 6}},
-  ...
-  {{"item_id": "item_{len(items):03d}", "score": X}}
-]
-
-Return ONLY the JSON array, no other text. Ensure you have exactly {len(items)} items."""
+Return JSON array with EXACTLY {len(items)} items:
+[{{"item_id": "...", "score": X}}, ...]
+"""
         
         return prompt
     
@@ -479,7 +496,10 @@ Return ONLY the JSON array, no other text. Ensure you have exactly {len(items)} 
         items: Sequence[Candidates],
     ) -> List[List[Candidates]]:
         """
-        Batch items based on token limits to avoid exceeding context window.
+        Batch items based on fixed batch size first, then check token limits.
+        
+        First splits items into fixed-size batches (llm_rerank_batch_size),
+        then further splits any batch that exceeds token limits.
         
         Args:
             query: User query text
@@ -493,8 +513,6 @@ Return ONLY the JSON array, no other text. Ensure you have exactly {len(items)} 
         base_tokens = self._estimate_tokens(base_prompt)
         
         # Estimate output tokens: base reserve + tokens per item
-        # For batching, we use a conservative estimate (assuming max items per batch)
-        # The actual output tokens will be calculated per batch in _call_llm_for_single_batch
         estimated_output_tokens = self.llm_reserved_output_tokens
         
         # Available tokens for items = total context - base prompt - estimated output
@@ -508,39 +526,60 @@ Return ONLY the JSON array, no other text. Ensure you have exactly {len(items)} 
             )
             return [[item] for item in items]
         
-        batches: List[List[Candidates]] = []
-        current_batch: List[Candidates] = []
-        current_batch_tokens = 0
+        # Step 1: Split items into fixed-size batches first
+        fixed_size_batches: List[List[Candidates]] = []
+        for i in range(0, len(items), self.llm_rerank_batch_size):
+            fixed_size_batches.append(list(items[i:i + self.llm_rerank_batch_size]))
         
-        for item in items:
-            # Truncate item text if needed (based on tokens, not characters)
-            text = self._truncate_text_to_tokens(item.text, self.llm_max_tokens_per_item)
+        # Step 2: For each fixed-size batch, check token limits and split further if needed
+        final_batches: List[List[Candidates]] = []
+        
+        for fixed_batch in fixed_size_batches:
+            # Estimate tokens for this fixed batch
+            batch_tokens = base_tokens
+            for idx, item in enumerate(fixed_batch):
+                text = self._truncate_text_to_tokens(item.text, self.llm_max_tokens_per_item)
+                item_line = f"{idx+1}. item_id: {item.id}, name: {item.name}, text: {text}"
+                batch_tokens += self._estimate_tokens(item_line)
             
-            # Estimate tokens for this item in the prompt format
-            item_line = f"{len(current_batch)+1}. item_id: {item.id}, name: {item.name}, text: {text}"
-            item_tokens = self._estimate_tokens(item_line)
-            
-            # Check if adding this item would exceed the limit
-            if current_batch_tokens + item_tokens > available_tokens and current_batch:
-                # Start a new batch
-                batches.append(current_batch)
-                current_batch = [item]
-                current_batch_tokens = item_tokens
+            # If this batch fits within token limits, add it as-is
+            if batch_tokens <= available_tokens:
+                final_batches.append(fixed_batch)
             else:
-                # Add to current batch
-                current_batch.append(item)
-                current_batch_tokens += item_tokens
+                # This batch exceeds token limits, split it further based on tokens
+                LOGGER.debug(
+                    "Fixed-size batch (%d items) exceeds token limit (%d > %d), splitting further",
+                    len(fixed_batch), batch_tokens, available_tokens
+                )
+                current_batch: List[Candidates] = []
+                current_batch_tokens = base_tokens
+                
+                for item in fixed_batch:
+                    text = self._truncate_text_to_tokens(item.text, self.llm_max_tokens_per_item)
+                    item_line = f"{len(current_batch)+1}. item_id: {item.id}, name: {item.name}, text: {text}"
+                    item_tokens = self._estimate_tokens(item_line)
+                    
+                    # Check if adding this item would exceed the limit
+                    if current_batch_tokens + item_tokens > available_tokens and current_batch:
+                        # Start a new batch
+                        final_batches.append(current_batch)
+                        current_batch = [item]
+                        current_batch_tokens = base_tokens + item_tokens
+                    else:
+                        # Add to current batch
+                        current_batch.append(item)
+                        current_batch_tokens += item_tokens
+                
+                # Add remaining batch
+                if current_batch:
+                    final_batches.append(current_batch)
         
-        # Add remaining batch
-        if current_batch:
-            batches.append(current_batch)
-        
-        LOGGER.debug(
-            "Batched %d items into %d batches (available_tokens=%d per batch)",
-            len(items), len(batches), available_tokens
+        LOGGER.info(
+            "Batched %d items into %d batches (batch_size=%d, available_tokens=%d per batch)",
+            len(items), len(final_batches), self.llm_rerank_batch_size, available_tokens
         )
         
-        return batches
+        return final_batches
     
     def _call_llm_for_single_batch(
         self,
@@ -563,14 +602,16 @@ Return ONLY the JSON array, no other text. Ensure you have exactly {len(items)} 
         prompt = self._build_rerank_prompt(query, items)
         
         # Calculate max_tokens based on number of items
-        # Each item output: {"item_id": "...", "score": X} ≈ 50-70 tokens
-        # Add significantly larger buffer for JSON array format and potential variations
-        # For large batches (50 items), we need much more buffer to avoid truncation
-        # Note: LLM may stop early even if max_tokens is sufficient, so we use a very large buffer
-        base_buffer = 1000  # Base buffer for JSON array format and structure (increased from 500)
-        item_buffer_multiplier = 2.5  # Extra buffer multiplier for safety (increased from 2.0)
-        estimated_response_tokens = int(len(items) * self.llm_tokens_per_item_output * item_buffer_multiplier + base_buffer)
-        max_tokens = max(4000, estimated_response_tokens)  # Minimum increased from 2000 to 4000
+        # Actual observed: 20 items used ~724 tokens (avg 36 tokens/item)
+        # Original estimate was 80 tokens/item, but actual is ~36 tokens/item
+        # We use a more realistic estimate: 54 tokens/item (36 × 1.5) with 2.0x multiplier for safety
+        base_buffer = 800  # Base buffer for JSON array format and structure
+        item_buffer_multiplier = 2.0  # Buffer multiplier (based on actual usage: 36 tokens/item observed)
+        # Use actual observed tokens per item (36) with 1.5x multiplier for estimate
+        actual_tokens_per_item = 36  # Observed from: 724 tokens / 20 items
+        estimated_tokens_per_item = int(actual_tokens_per_item * 1.5)  # 36 × 1.5 = 54 tokens/item
+        estimated_response_tokens = int(len(items) * estimated_tokens_per_item * item_buffer_multiplier + base_buffer)
+        max_tokens = max(1500, estimated_response_tokens)  # Minimum: 1500 (sufficient for 20 items: 20×54×2.0+800=2960)
         
         # Ensure we don't exceed context window (but allow up to reasonable limit)
         # The actual prompt + output should not exceed context window
@@ -777,22 +818,41 @@ Return ONLY the JSON array, no other text. Ensure you have exactly {len(items)} 
             LOGGER.info("Single batch: %d items (batching took %.2fs)", len(items), batching_time)
             return self._call_llm_for_single_batch(query, items)
         
-        # Process multiple batches
-        LOGGER.info("Processing %d items in %d batches (batching took %.2fs)", len(items), len(batches), batching_time)
+        # Process multiple batches concurrently
+        LOGGER.info("Processing %d items in %d batches concurrently (batching took %.2fs)", len(items), len(batches), batching_time)
         all_scores: List[Dict[str, float]] = []
         
-        for batch_idx, batch in enumerate(batches, 1):
-            batch_start = time.time()
-            LOGGER.info("Processing batch %d/%d: %d items", batch_idx, len(batches), len(batch))
-            try:
-                batch_scores = self._call_llm_for_single_batch(query, batch)
-                batch_time = time.time() - batch_start
-                LOGGER.info("Batch %d/%d completed in %.2fs: %d scores returned", batch_idx, len(batches), batch_time, len(batch_scores))
-                all_scores.extend(batch_scores)
-            except Exception as exc:
-                batch_time = time.time() - batch_start
-                LOGGER.error("Batch %d/%d failed after %.2fs: %s", batch_idx, len(batches), batch_time, exc)
-                raise
+        # Use ThreadPoolExecutor for concurrent batch processing
+        total_start = time.time()
+        with ThreadPoolExecutor(max_workers=len(batches)) as executor:
+            # Submit all batches with start time tracking
+            batch_starts = {}
+            future_to_batch = {}
+            for batch_idx, batch in enumerate(batches, 1):
+                batch_starts[batch_idx] = time.time()
+                future = executor.submit(self._call_llm_for_single_batch, query, batch)
+                future_to_batch[future] = (batch_idx, batch)
+            
+            # Process completed batches as they finish
+            batch_results = {}
+            for future in as_completed(future_to_batch):
+                batch_idx, batch = future_to_batch[future]
+                try:
+                    batch_scores = future.result()
+                    batch_time = time.time() - batch_starts[batch_idx]
+                    batch_results[batch_idx] = batch_scores
+                    LOGGER.info("Batch %d/%d completed in %.2fs: %d scores returned", batch_idx, len(batches), batch_time, len(batch_scores))
+                except Exception as exc:
+                    batch_time = time.time() - batch_starts[batch_idx]
+                    LOGGER.error("Batch %d/%d failed after %.2fs: %s", batch_idx, len(batches), batch_time, exc)
+                    raise
+        
+        total_time = time.time() - total_start
+        LOGGER.info("Concurrent processing completed in %.2fs (batches: %d)", total_time, len(batches))
+        
+        # Combine results in batch order
+        for batch_idx in sorted(batch_results.keys()):
+            all_scores.extend(batch_results[batch_idx])
         
         LOGGER.info("All %d batches completed. Total scores: %d (expected %d)", len(batches), len(all_scores), len(items))
         return all_scores
@@ -878,7 +938,35 @@ Return ONLY the JSON array, no other text. Ensure you have exactly {len(items)} 
                 merged_items=[],  # Empty when no items to re-rank
             )
         
-        # Step 4: LLM re-scoring and re-ranking
+        # Step 4 (optional): First-stage lightweight reranking (50 → 20)
+        if self.use_two_stage_reranking and self.lightweight_reranker:
+            original_count = len(items_for_llm)
+            LOGGER.info(
+                "Query %s: First-stage lightweight reranking (%d → %d items)",
+                query_id, original_count, self.lightweight_reranker_top_k
+            )
+            rerank_start = time.time()
+            try:
+                items_for_llm = self.lightweight_reranker.rerank_candidates(
+                    query=query,
+                    candidates=items_for_llm,
+                    top_k=self.lightweight_reranker_top_k,
+                )
+                rerank_time = time.time() - rerank_start
+                LOGGER.info(
+                    "Query %s: First-stage reranking completed in %.2fs (%d → %d items)",
+                    query_id, rerank_time, original_count, len(items_for_llm)
+                )
+            except Exception as exc:
+                rerank_time = time.time() - rerank_start
+                LOGGER.error(
+                    "Query %s: First-stage reranking failed after %.2fs: %s",
+                    query_id, rerank_time, exc
+                )
+                # Continue with original items_for_llm if reranking fails
+                LOGGER.warning("Query %s: Continuing with original %d items", query_id, len(items_for_llm))
+        
+        # Step 5: LLM re-scoring and re-ranking (final stage)
         LOGGER.info("Query %s: LLM re-ranking %d items", query_id, len(items_for_llm))
         llm_start = time.time()
         try:
