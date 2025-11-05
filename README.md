@@ -1,4 +1,57 @@
 
+## Intro
+A semantic search system that matches natural language food queries to the most relevant food items in our dataset.
+
+## Quick-start
+
+
+## Demo
+
+```bash
+$ python scripts/demo_query_selector.py [query_index]
+# query_index: Row number (1-100) in given query dataset data/raw/queries.csv
+```
+
+```
+================================================================================
+Performing Hybrid Search...
+================================================================================
+Query: Sanduíche de café da manhã com abacate
+Query ID: 5
+  Query embedding (local model) completed in 0.350s
+  HNSW search completed in 0.007s
+
+================================================================================
+RESULTS
+================================================================================
+
+Top-10 Results:
+--------------------------------------------------------------------------------
+   1. [148c2ee9-ddc7-42db-b342-639cacdaafc4] Queijo Quente Bacon (score: -3.4102)
+   2. [56d13cdc-f76a-4412-a0b4-af09839b2689] Pão francês com presunto e queijo (score: -3.7090)
+   3. [3725415a-7fd2-4981-a28c-e07c91def2c6] Sanduíche natural (score: -3.7812)
+   4. [252373d9-89b4-485a-8dda-d790216ded09] Promoção da casa (score: -4.2969)
+   5. [86a220ca-a5b4-4df6-bd02-6aed29bd7981] Cesta de Mccafé da Manhã (score: -4.3945)
+   6. [5a039127-9b48-4166-935a-ab3e555234aa] Sanduíche de Churrasco de Carne Bovina (score: -4.6211)
+   7. [9033455a-4ac7-4a23-a399-de0e049164fe] Egg Cheese Bacon - Promo Mcd (score: -4.6484)
+   8. [d44737ed-9026-426e-9a07-7a6ee1948358] Peru & Queijo (score: -4.8242)
+   9. [e90a5039-94b9-4ce4-8d89-bb362b67432c] Misto quente Com Ovo (score: -4.8555)
+  10. [853172c5-8035-4195-a851-a2b3671a2a1d] Misto Quente (score: -5.1016)
+
+Score Range: -5.1016 - -3.4102
+
+================================================================================
+TIMING BREAKDOWN
+================================================================================
+  BM25 Retrieval:        16.30 ms
+  Vector Retrieval:      357.38 ms
+  RRF Fusion:            0.30 ms
+  Cross-Encoder Re-rank: 1130.29 ms
+--------------------------------------------------------------------------------
+  TOTAL LATENCY:         1494.82 ms (1.495 s)
+================================================================================
+
+```
 
 ## Architecture Design
 
@@ -150,7 +203,7 @@ Concurrent text retriever + vector retriever (top-50 + top-50) → RRF fusion (t
 
 
 The overall latency (≈1.85s) is relatively high compared to the ideal target (<1s).
-
+Several reasons were discovered during implementation:
 1. **Limited GPU parallelism on macOS (MPS)**  
    Apple’s Metal Performance Shader (MPS) backend currently does not support true parallel inference or concurrent batching. 
    As a result, multiple batches of Cross-Encoder re-ranking are executed sequentially rather than concurrently, leading to longer total inference time.
