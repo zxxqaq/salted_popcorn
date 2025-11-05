@@ -65,6 +65,8 @@ class HybridRetrievalResult:
     rrf_time: float = 0.0  # or merge_time if not using RRF
     rerank_time: float = 0.0
     total_time: float = 0.0
+    # Detailed Cross-Encoder timing breakdown
+    ce_timing_info: dict | None = None  # Detailed timing from LightweightReranker
 
 
 class HybridRetriever:
@@ -696,12 +698,17 @@ class HybridRetriever:
                 top_k=rerank_top_k,  # Get top-K scores (or all if reranker_top_k is None)
             )
             rerank_time = time.time() - rerank_start
+            
+            # Get detailed timing breakdown from reranker
+            ce_timing_info = self.reranker.get_last_timing_info()
+            
             LOGGER.info(
                 "Query %s: Cross-Encoder re-ranking completed in %.2fs (%d items scored)",
                 query_id, rerank_time, len(items_for_reranking)
             )
         except Exception as exc:
             rerank_time = time.time() - rerank_start
+            ce_timing_info = None  # No timing info on error
             LOGGER.error(
                 "Query %s: Cross-Encoder re-ranking failed after %.2fs: %s",
                 query_id, rerank_time, exc
@@ -758,6 +765,7 @@ class HybridRetriever:
             rrf_time=rrf_time if self.use_rrf else merge_time,
             rerank_time=rerank_time,
             total_time=total_time,
+            ce_timing_info=ce_timing_info,
         )
 
 

@@ -612,38 +612,13 @@ def main():
             print(f"\n  ... (showing top-10 of {len(ground_truth)} ground truth items)")
         print(f"\n  Ground Truth Score Range: {min(s for _, s in top_10_gt):.1f} - {max(s for _, s in top_10_gt):.1f}")
     
-    # 1. BM25 Results (top-50)
-    print("\n" + "-" * 80)
-    print(f"1. BM25 Text Retrieval Results (Top-{retrieval_top_k})")
-    print("-" * 80)
-    if result.bm25_results:
-        display_count = min(retrieval_top_k, len(result.bm25_results))
-        for rank, (candidate, score) in enumerate(result.bm25_results[:display_count], 1):
-            print(format_item_result(candidate, score, rank))
-        if len(result.bm25_results) > retrieval_top_k:
-            print(f"\n  ... (showing top-{retrieval_top_k} of {len(result.bm25_results)} results)")
-    else:
-        print("  No BM25 results found.")
-    
-    # 2. Vector Results (top-50)
-    print("\n" + "-" * 80)
-    print(f"2. Vector Retrieval Results (Top-{retrieval_top_k})")
-    print("-" * 80)
-    if result.vector_results:
-        display_count = min(retrieval_top_k, len(result.vector_results))
-        for rank, (candidate, score) in enumerate(result.vector_results[:display_count], 1):
-            print(format_item_result(candidate, score, rank))
-        if len(result.vector_results) > retrieval_top_k:
-            print(f"\n  ... (showing top-{retrieval_top_k} of {len(result.vector_results)} results)")
-    else:
-        print("  No vector results found.")
-    
-    # 3. Merged Items (before Cross-Encoder re-ranking)
+    # 1. Merged Items (before Cross-Encoder re-ranking)
+    # Note: BM25 and Vector results are not displayed to reduce output clutter
     print("\n" + "-" * 80)
     if use_rrf:
-        print(f"3. RRF Fusion Results (Before Cross-Encoder Re-ranking): {len(result.merged_items)} items")
+        print(f"1. RRF Fusion Results (Before Cross-Encoder Re-ranking): {len(result.merged_items)} items")
     else:
-        print(f"3. Merged Items (Before Cross-Encoder Re-ranking): {len(result.merged_items)} unique items")
+        print(f"1. Merged Items (Before Cross-Encoder Re-ranking): {len(result.merged_items)} unique items")
     print("-" * 80)
     if use_rrf:
         print(f"  Total items after RRF fusion: {len(result.merged_items)}")
@@ -652,9 +627,9 @@ def main():
         print(f"  Total unique items after deduplication: {len(result.merged_items)}")
         print(f"  (BM25: {len(result.bm25_results)} + Vector: {len(result.vector_results)} -> {len(result.merged_items)} unique)")
     
-    # 4. Top-K_1 Results (after Cross-Encoder re-ranking)
+    # 2. Top-K_1 Results (after Cross-Encoder re-ranking)
     print("\n" + "-" * 80)
-    print(f"4. Top-{final_top_k_1} Results (After Cross-Encoder Re-ranking)")
+    print(f"2. Top-{final_top_k_1} Results (After Cross-Encoder Re-ranking)")
     print("-" * 80)
     if result.top_5:
         for rank, (candidate, score) in enumerate(result.top_5, 1):
@@ -663,9 +638,9 @@ def main():
     else:
         print(f"  No top-{final_top_k_1} results found.")
     
-    # 5. Top-K_2 Results (after Cross-Encoder re-ranking)
+    # 3. Top-K_2 Results (after Cross-Encoder re-ranking)
     print("\n" + "-" * 80)
-    print(f"5. Top-{final_top_k_2} Results (After Cross-Encoder Re-ranking)")
+    print(f"3. Top-{final_top_k_2} Results (After Cross-Encoder Re-ranking)")
     print("-" * 80)
     if result.top_10:
         for rank, (candidate, score) in enumerate(result.top_10, 1):
@@ -718,6 +693,126 @@ def main():
     print("-" * 80)
     print(f"  TOTAL TIME:            {result.total_time:.3f}s")
     print("=" * 80)
+    
+    # Detailed Cross-Encoder timing breakdown
+    if result.ce_timing_info:
+        print("\n" + "=" * 80)
+        print("CROSS-ENCODER DETAILED TIMING")
+        print("=" * 80)
+        ce_info = result.ce_timing_info
+        print(f"  Build Pairs Time:      {ce_info.get('build_pairs_time', 0):.4f}s")
+        print(f"  Total Inference Time:  {ce_info.get('total_inference_time', 0):.4f}s")
+        print(f"  Number of Batches:     {ce_info.get('num_batches', 0)}")
+        print(f"  Concurrent Processing: {'Yes' if ce_info.get('concurrent', False) else 'No'}")
+        
+        batch_times = ce_info.get('batch_times', [])
+        if batch_times:
+            avg_batch_time = sum(batch_times) / len(batch_times)
+            max_batch_time = max(batch_times)
+            min_batch_time = min(batch_times)
+            print(f"  Batch Processing:")
+            print(f"    - Average: {avg_batch_time:.4f}s")
+            print(f"    - Min:     {min_batch_time:.4f}s")
+            print(f"    - Max:     {max_batch_time:.4f}s")
+            if len(batch_times) <= 10:
+                print(f"    - Individual: {', '.join(f'{t:.4f}s' for t in batch_times)}")
+            else:
+                print(f"    - Individual (first 5): {', '.join(f'{t:.4f}s' for t in batch_times[:5])} ...")
+        
+        # Calculate overhead
+        total_ce_time = ce_info.get('build_pairs_time', 0) + ce_info.get('total_inference_time', 0)
+        overhead = result.rerank_time - total_ce_time
+        if overhead > 0.001:
+            print(f"  Overhead (sorting, etc.): {overhead:.4f}s ({overhead/result.rerank_time*100:.1f}%)")
+        
+        # Performance analysis
+        print("\n  Performance Analysis:")
+        if ce_info.get('total_inference_time', 0) > 0:
+            inference_ratio = ce_info.get('total_inference_time', 0) / result.rerank_time
+            print(f"    - Inference time ratio: {inference_ratio*100:.1f}% of total CE time")
+        
+        if batch_times and ce_info.get('concurrent', False):
+            # Check if batches are well-balanced
+            if max_batch_time > 0:
+                imbalance_ratio = (max_batch_time - min_batch_time) / max_batch_time
+                if imbalance_ratio > 0.3:
+                    print(f"    - ⚠ Batch imbalance detected: {imbalance_ratio*100:.1f}% difference")
+                    print(f"      Consider adjusting batch_size or max_concurrent_batches")
+                else:
+                    print(f"    - ✓ Batches are well-balanced")
+        
+        # Speedup suggestions
+        print("\n  Speedup Suggestions:")
+        num_items = len(result.merged_items) if result.merged_items else 0
+        
+        if ce_info.get('build_pairs_time', 0) > 0.1:
+            print(f"    - Build pairs time ({ce_info.get('build_pairs_time', 0):.4f}s) is high")
+            print(f"      Consider enabling tokenization cache: RERANKER_TOKENIZATION_CACHE_ENABLED=True")
+        
+        if ce_info.get('total_inference_time', 0) > 0 and num_items > 0:
+            avg_time_per_item = ce_info.get('total_inference_time', 0) / num_items
+            total_inference = ce_info.get('total_inference_time', 0)
+            
+            if avg_time_per_item > 0.1:
+                print(f"    - Average time per item ({avg_time_per_item:.4f}s = {avg_time_per_item*1000:.1f}ms) is high")
+                
+                # Check if using MPS/CUDA
+                if reranker_device and reranker_device.lower() in ('mps', 'cuda'):
+                    print(f"      ✓ Using {reranker_device.upper()} device (GPU acceleration enabled)")
+                    if avg_time_per_item > 0.05:
+                        print(f"      ⚠ Despite GPU, still slow. Possible causes:")
+                        print(f"        • Model too large (current: {reranker_model})")
+                        print(f"        • FP16 not fully utilized")
+                        print(f"        • Consider smaller model: BAAI/bge-reranker-v2-m3")
+                else:
+                    print(f"      ⚠ Not using GPU acceleration (device: {reranker_device or 'auto'})")
+                    print(f"      → Set RERANKER_DEVICE=mps (Mac) or RERANKER_DEVICE=cuda (Linux/Windows)")
+                
+                # Batch size suggestions
+                if num_items <= reranker_batch_size:
+                    print(f"      • Only {num_items} items (batch_size={reranker_batch_size}), single batch")
+                    print(f"        → Increasing batch_size won't help (already fits in one batch)")
+                    print(f"        → Consider: reducing pre-filtering to get more items for batch processing")
+                else:
+                    num_batches = ce_info.get('num_batches', 1)
+                    if num_batches > 1:
+                        print(f"      • {num_items} items split into {num_batches} batches (batch_size={reranker_batch_size})")
+                        if reranker_batch_size < 64:
+                            print(f"        → Consider increasing RERANKER_BATCH_SIZE to 64 or 128")
+                        if not ce_info.get('concurrent', False):
+                            print(f"        → Enable concurrent processing: RERANKER_MAX_CONCURRENT_BATCHES=2 or 4")
+                    else:
+                        print(f"      • {num_items} items in single batch (batch_size={reranker_batch_size})")
+                        if reranker_batch_size < 64 and num_items < 64:
+                            print(f"        → Consider increasing RERANKER_BATCH_SIZE to 64 for better GPU utilization")
+                
+                # Model size suggestions
+                if 'large' in reranker_model.lower():
+                    print(f"      • Using large model ({reranker_model})")
+                    print(f"        → Consider smaller model: BAAI/bge-reranker-v2-m3 (2-3x faster)")
+                elif 'v2-m3' in reranker_model.lower():
+                    print(f"      • Already using compact model ({reranker_model})")
+                    print(f"        → Further speedup: reduce items via pre-filtering or use lighter retrieval")
+        
+        if not ce_info.get('concurrent', False) and ce_info.get('num_batches', 0) > 1:
+            print(f"    - Multiple batches ({ce_info.get('num_batches', 0)}) but concurrent processing disabled")
+            print(f"      → Enable: RERANKER_MAX_CONCURRENT_BATCHES=2 or 4")
+            print(f"      → Expected speedup: ~{min(2, ce_info.get('num_batches', 0))}x for {ce_info.get('num_batches', 0)} batches")
+        
+        # Overall performance summary
+        if ce_info.get('total_inference_time', 0) > 0 and num_items > 0:
+            items_per_second = num_items / ce_info.get('total_inference_time', 1)
+            print(f"\n  Performance Summary:")
+            print(f"    - Throughput: {items_per_second:.1f} items/second")
+            if items_per_second < 10:
+                print(f"      ⚠ Low throughput. Target: >20 items/s with GPU, >5 items/s on CPU")
+            elif items_per_second < 20:
+                print(f"      ⚠ Moderate throughput. Target: >20 items/s with GPU acceleration")
+            else:
+                print(f"      ✓ Good throughput")
+        
+        print("=" * 80)
+    
     print("\n" + "=" * 80)
     print("Demo completed!")
     print("=" * 80)

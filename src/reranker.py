@@ -204,6 +204,9 @@ class LightweightReranker:
                 if self.tokenization_cache_enabled:
                     self._load_tokenization_cache()
                 
+                # Initialize timing info storage
+                self._last_timing_info = None
+                
                 # Warmup: Run a dummy reranking to initialize model internals and move to GPU if available
                 # This significantly speeds up subsequent reranking operations
                 LOGGER.debug("Warming up reranker model...")
@@ -323,7 +326,7 @@ class LightweightReranker:
         
         return tokenized
     
-    def _build_pairs_with_cache(self, query: str, items: Sequence[Tuple[str, str]]) -> List[Tuple[str, str]]:
+    def _build_pairs_with_cache(self, query: str, items: Sequence[Tuple[str, str]]) -> Tuple[List[Tuple[str, str]], float]:
         """
         Build query-document pairs, using cached tokenized documents if available.
         
@@ -338,8 +341,11 @@ class LightweightReranker:
             items: List of (item_id, item_text) tuples
             
         Returns:
-            List of (query, document_text) pairs
+            Tuple of (pairs, time_taken) where pairs is List of (query, document_text) pairs
         """
+        import time
+        start_time = time.time()
+        
         # For now, we'll build pairs normally. The pre-tokenization cache is mainly
         # useful if we want to implement custom batching with dynamic padding ourselves,
         # but FlagReranker already handles this efficiently.
@@ -350,9 +356,10 @@ class LightweightReranker:
         if self.tokenization_cache_enabled:
             self._pre_tokenize_items(items)
         
-        return pairs
+        time_taken = time.time() - start_time
+        return pairs, time_taken
     
-    def _rerank_batches_concurrent(self, pairs: List[Tuple[str, str]]) -> List[float]:
+    def _rerank_batches_concurrent(self, pairs: List[Tuple[str, str]]) -> Tuple[List[float], dict]:
         """
         Process batches concurrently for better performance.
         
@@ -360,14 +367,31 @@ class LightweightReranker:
             pairs: List of (query, document) text pairs
             
         Returns:
-            List of scores corresponding to each pair
+            Tuple of (scores, timing_info) where:
+            - scores: List of scores corresponding to each pair
+            - timing_info: Dict with timing breakdown (build_pairs_time, batch_times, total_time, etc.)
         """
+        import time
+        timing_info = {
+            'num_batches': 0,
+            'batch_times': [],
+            'total_inference_time': 0.0,
+            'concurrent': False,
+        }
+        
         if len(pairs) <= self.batch_size:
             # Single batch, no need for concurrency
+            batch_start = time.time()
             batch_scores = self.model.compute_score(pairs)
+            batch_time = time.time() - batch_start
+            timing_info['num_batches'] = 1
+            timing_info['batch_times'] = [batch_time]
+            timing_info['total_inference_time'] = batch_time
+            timing_info['concurrent'] = False
+            
             if isinstance(batch_scores, (int, float)):
-                return [float(batch_scores)] * len(pairs)
-            return [float(s) for s in batch_scores]
+                return [float(batch_scores)] * len(pairs), timing_info
+            return [float(s) for s in batch_scores], timing_info
         
         # Split into batches
         batches = []
@@ -375,34 +399,97 @@ class LightweightReranker:
             batch_pairs = pairs[i:i + self.batch_size]
             batches.append(batch_pairs)
         
-        LOGGER.debug("Processing %d batches (batch_size=%d, max_concurrent=%d)", 
-                    len(batches), self.batch_size, self.max_concurrent_batches)
+        timing_info['num_batches'] = len(batches)
         
-        # Process batches concurrently
-        all_scores = [None] * len(pairs)
+        # Try concurrent processing first, but fall back to sequential if needed
+        # MPS device may have issues with concurrent batch processing ("Already borrowed" error)
+        # We'll try concurrent first, and if it fails, we'll catch the error and retry sequentially
+        use_concurrent = self.max_concurrent_batches > 1
+        timing_info['concurrent'] = use_concurrent
         
-        def process_batch(batch_idx: int, batch_pairs: List[Tuple[str, str]]) -> Tuple[int, List[float]]:
-            """Process a single batch and return scores."""
+        LOGGER.debug("Processing %d batches (batch_size=%d, max_concurrent=%d, concurrent=%s)", 
+                    len(batches), self.batch_size, self.max_concurrent_batches, use_concurrent)
+        
+        # Initialize all_scores
+        all_scores = [0.0] * len(pairs)
+        batch_times = [0.0] * len(batches)
+        
+        def process_batch(batch_idx: int, batch_pairs: List[Tuple[str, str]]) -> Tuple[int, List[float], float]:
+            """Process a single batch and return scores with timing."""
+            batch_start = time.time()
             batch_scores = self.model.compute_score(batch_pairs)
+            batch_time = time.time() - batch_start
+            
             if isinstance(batch_scores, (int, float)):
                 batch_scores = [float(batch_scores)] * len(batch_pairs)
             else:
                 batch_scores = [float(s) for s in batch_scores]
-            return batch_idx, batch_scores
+            return batch_idx, batch_scores, batch_time
         
-        # Use ThreadPoolExecutor for concurrent batch processing
-        # Note: ThreadPoolExecutor is suitable here because compute_score may release GIL
-        # and MPS/CUDA operations can benefit from parallel execution
-        with ThreadPoolExecutor(max_workers=self.max_concurrent_batches) as executor:
-            futures = {
-                executor.submit(process_batch, i, batch): i 
-                for i, batch in enumerate(batches)
-            }
-            
-            for future in as_completed(futures):
-                batch_idx = futures[future]
+        inference_start = time.time()
+        
+        if use_concurrent:
+            # Try concurrent processing first
+            # Note: MPS may have "Already borrowed" errors, so we'll catch and fall back to sequential
+            try:
+                with ThreadPoolExecutor(max_workers=self.max_concurrent_batches) as executor:
+                    futures = {
+                        executor.submit(process_batch, i, batch): i 
+                        for i, batch in enumerate(batches)
+                    }
+                    
+                    for future in as_completed(futures):
+                        batch_idx = futures[future]
+                        try:
+                            idx, batch_scores, batch_time = future.result()
+                            batch_times[idx] = batch_time
+                            # Store scores in correct position
+                            start_idx = idx * self.batch_size
+                            for i, score in enumerate(batch_scores):
+                                all_scores[start_idx + i] = score
+                        except Exception as e:
+                            # If any batch fails with "Already borrowed" or similar, fall back to sequential
+                            error_msg = str(e).lower()
+                            if "already borrowed" in error_msg or "mps" in error_msg:
+                                LOGGER.warning("Concurrent processing failed (%s), falling back to sequential processing", e)
+                                raise  # Re-raise to trigger fallback
+                            else:
+                                LOGGER.error("Batch %d processing failed: %s", batch_idx, e)
+                                # Fill with dummy scores on error (non-recoverable)
+                                start_idx = batch_idx * self.batch_size
+                                end_idx = min(start_idx + self.batch_size, len(pairs))
+                                for i in range(start_idx, end_idx):
+                                    all_scores[i] = 0.0
+            except Exception as e:
+                # Fall back to sequential processing if concurrent processing fails
+                error_msg = str(e).lower()
+                if "already borrowed" in error_msg or (self.device == "mps" and "mps" in error_msg):
+                    LOGGER.warning("Concurrent batch processing not supported (MPS limitation), using sequential processing")
+                    timing_info['concurrent'] = False
+                    # Reset and process sequentially
+                    all_scores = [0.0] * len(pairs)
+                    for batch_idx, batch in enumerate(batches):
+                        try:
+                            idx, batch_scores, batch_time = process_batch(batch_idx, batch)
+                            batch_times[idx] = batch_time
+                            start_idx = idx * self.batch_size
+                            for i, score in enumerate(batch_scores):
+                                all_scores[start_idx + i] = score
+                        except Exception as batch_error:
+                            LOGGER.error("Batch %d processing failed even sequentially: %s", batch_idx, batch_error)
+                            start_idx = batch_idx * self.batch_size
+                            end_idx = min(start_idx + self.batch_size, len(pairs))
+                            for i in range(start_idx, end_idx):
+                                all_scores[i] = 0.0
+                else:
+                    # Re-raise if it's not a recoverable error
+                    raise
+        else:
+            # Sequential processing (when max_concurrent_batches=1)
+            for batch_idx, batch in enumerate(batches):
                 try:
-                    idx, batch_scores = future.result()
+                    idx, batch_scores, batch_time = process_batch(batch_idx, batch)
+                    batch_times[idx] = batch_time
                     # Store scores in correct position
                     start_idx = idx * self.batch_size
                     for i, score in enumerate(batch_scores):
@@ -415,7 +502,10 @@ class LightweightReranker:
                     for i in range(start_idx, end_idx):
                         all_scores[i] = 0.0
         
-        return all_scores
+        timing_info['total_inference_time'] = time.time() - inference_start
+        timing_info['batch_times'] = batch_times
+        
+        return all_scores, timing_info
     
     def rerank(
         self,
@@ -445,11 +535,12 @@ class LightweightReranker:
             LOGGER.debug("Only %d items (much fewer than top_k=%d), returning all without reranking", len(items), top_k)
             return [(item_id, 1.0) for item_id, _ in items]
         
-        # Build pairs (with caching support)
-        pairs = self._build_pairs_with_cache(query, items)
+        # Build pairs (with caching support) - track timing
+        pairs, build_pairs_time = self._build_pairs_with_cache(query, items)
         
         if self.use_api:
             scores = self._rerank_via_api(pairs)
+            timing_info = {'build_pairs_time': build_pairs_time, 'total_inference_time': 0.0}
         else:
             # Ensure model is initialized (should already be done in __init__)
             # This check ensures we don't include initialization time in reranking time
@@ -462,7 +553,14 @@ class LightweightReranker:
             # Process in batches with concurrent execution
             # Note: Model initialization time is NOT included here - it's done in __init__
             # FlagReranker handles dynamic padding automatically based on batch contents
-            scores = self._rerank_batches_concurrent(pairs)
+            scores, batch_timing_info = self._rerank_batches_concurrent(pairs)
+            timing_info = {
+                'build_pairs_time': build_pairs_time,
+                **batch_timing_info,
+            }
+        
+        # Store timing info for later retrieval
+        self._last_timing_info = timing_info
         
         # Handle both single score and list of scores (fallback for non-batched)
         if isinstance(scores, (int, float)):
@@ -497,6 +595,21 @@ class LightweightReranker:
         )
         
         return scored_items[:top_k]
+    
+    def get_last_timing_info(self) -> dict | None:
+        """
+        Get the timing breakdown from the last rerank call.
+        
+        Returns:
+            Dict with timing information, or None if no rerank has been called yet.
+            Keys include:
+            - build_pairs_time: Time to build query-document pairs
+            - total_inference_time: Total time for model inference
+            - num_batches: Number of batches processed
+            - batch_times: List of individual batch processing times
+            - concurrent: Whether concurrent processing was used
+        """
+        return getattr(self, '_last_timing_info', None)
     
     def _rerank_via_api(self, pairs: List[Tuple[str, str]]) -> List[float]:
         """Rerank via API (if API support is implemented)."""

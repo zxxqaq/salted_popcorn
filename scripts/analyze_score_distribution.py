@@ -357,9 +357,9 @@ def print_recommendations(
 def main():
     """Main analysis function."""
     # Load data paths
-    data_dir = REPO_ROOT / "data" / "test"
-    items_path = data_dir / "500_items.csv"
-    queries_path = data_dir / "10_queries.csv"
+    data_dir = REPO_ROOT / "data" / "raw"
+    items_path = data_dir / "5k_items.csv"
+    queries_path = REPO_ROOT / "data" / "test" / "10_queries.csv"
 
     if not items_path.exists() or not queries_path.exists():
         print(f"❌ Error: Data files not found")
