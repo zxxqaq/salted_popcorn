@@ -51,8 +51,6 @@ Put here to specify in case you want to regenerate cache files. Make sure check 
    docker-compose run --rm semantic-search bash
    # Inside container:
    python scripts/demo_query_selector.py 5
-   # Or run without arguments for interactive query selection:
-   python scripts/demo_query_selector.py
    exit
    ```
 
