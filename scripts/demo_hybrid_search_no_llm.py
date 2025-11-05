@@ -449,6 +449,36 @@ def main():
     except ValueError as e:
         raise ValueError(f"Invalid RERANKER_MAX_CONCURRENT_BATCHES value '{reranker_max_concurrent_batches_str}': {e}")
     
+    # Pre-filtering parameters
+    reranker_prefilter_enabled_str = os.getenv("RERANKER_PREFILTER_ENABLED", "True").strip().lower()
+    reranker_prefilter_enabled = reranker_prefilter_enabled_str in ("true", "1", "yes")
+    
+    reranker_prefilter_min_score_str = os.getenv("RERANKER_PREFILTER_MIN_SCORE")
+    reranker_prefilter_min_score = None
+    if reranker_prefilter_min_score_str and reranker_prefilter_min_score_str.strip():
+        try:
+            reranker_prefilter_min_score = float(reranker_prefilter_min_score_str.strip())
+        except ValueError as e:
+            raise ValueError(f"Invalid RERANKER_PREFILTER_MIN_SCORE value '{reranker_prefilter_min_score_str}': {e}")
+    
+    reranker_prefilter_score_diff_threshold_str = os.getenv("RERANKER_PREFILTER_SCORE_DIFF_THRESHOLD")
+    reranker_prefilter_score_diff_threshold = None
+    if reranker_prefilter_score_diff_threshold_str and reranker_prefilter_score_diff_threshold_str.strip():
+        try:
+            reranker_prefilter_score_diff_threshold = float(reranker_prefilter_score_diff_threshold_str.strip())
+            if reranker_prefilter_score_diff_threshold <= 0:
+                raise ValueError(f"reranker_prefilter_score_diff_threshold must be positive, got {reranker_prefilter_score_diff_threshold}")
+        except ValueError as e:
+            raise ValueError(f"Invalid RERANKER_PREFILTER_SCORE_DIFF_THRESHOLD value '{reranker_prefilter_score_diff_threshold_str}': {e}")
+    
+    reranker_prefilter_min_items_str = os.getenv("RERANKER_PREFILTER_MIN_ITEMS", "20").strip()
+    try:
+        reranker_prefilter_min_items = int(reranker_prefilter_min_items_str)
+        if reranker_prefilter_min_items <= 0:
+            raise ValueError(f"reranker_prefilter_min_items must be positive, got {reranker_prefilter_min_items}")
+    except ValueError as e:
+        raise ValueError(f"Invalid RERANKER_PREFILTER_MIN_ITEMS value '{reranker_prefilter_min_items_str}': {e}")
+    
     # Initialize hybrid retriever
     print("\nInitializing hybrid retriever...")
     print(f"  • BM25: k1={bm25_k1}, b={bm25_b}")
@@ -464,6 +494,11 @@ def main():
             print(f"  • Vector: {vector_model_name} (dim={vector_dimensions}) - Items & Query: API")
     print(f"  • Cross-Encoder: {reranker_model} (device={reranker_device or 'auto'}, batch_size={reranker_batch_size}, fp16=True)")
     print(f"  • Cross-Encoder optimization: max_concurrent_batches={reranker_max_concurrent_batches}, tokenization_cache={'enabled' if reranker_tokenization_cache_enabled else 'disabled'}")
+    if reranker_prefilter_enabled:
+        prefilter_info = f"enabled (min_score={reranker_prefilter_min_score}, score_diff_threshold={reranker_prefilter_score_diff_threshold}, min_items={reranker_prefilter_min_items})"
+        print(f"  • Pre-filtering: {prefilter_info}")
+    else:
+        print(f"  • Pre-filtering: disabled")
     if reranker_top_k is not None:
         print(f"  • Cross-Encoder top-K: {reranker_top_k} (will return top-{reranker_top_k} items)")
     else:
@@ -516,6 +551,10 @@ def main():
         reranker_tokenization_cache_dir=reranker_tokenization_cache_dir,
         reranker_tokenization_cache_enabled=reranker_tokenization_cache_enabled,
         reranker_max_concurrent_batches=reranker_max_concurrent_batches,
+        reranker_prefilter_enabled=reranker_prefilter_enabled,
+        reranker_prefilter_min_score=reranker_prefilter_min_score,
+        reranker_prefilter_score_diff_threshold=reranker_prefilter_score_diff_threshold,
+        reranker_prefilter_min_items=reranker_prefilter_min_items,
         # Query embedding parameters (optional)
         vector_query_embedding_model=vector_query_embedding_model,
         # BM25 caching parameters (optional)

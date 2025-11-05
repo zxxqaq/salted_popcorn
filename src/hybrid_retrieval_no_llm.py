@@ -118,6 +118,11 @@ class HybridRetriever:
         reranker_tokenization_cache_dir: Path | str | None = None,  # Directory for pre-tokenization cache
         reranker_tokenization_cache_enabled: bool = True,  # Enable pre-tokenization caching
         reranker_max_concurrent_batches: int = 2,  # Number of batches to process concurrently
+        # Pre-filtering parameters (before Cross-Encoder re-ranking)
+        reranker_prefilter_enabled: bool = True,  # Enable pre-filtering based on scores
+        reranker_prefilter_min_score: float | None = None,  # Minimum score threshold (items below this are filtered out)
+        reranker_prefilter_score_diff_threshold: float | None = None,  # Score difference threshold (if difference > threshold, truncate)
+        reranker_prefilter_min_items: int = 20,  # Minimum items to keep after filtering (if filtered items < min, keep top-N)
         # Query embedding parameters (optional, must come after all required parameters)
         vector_query_embedding_model: str | None = None,  # Optional: Local SentenceTransformer model for query embeddings
         # BM25 caching parameters (optional, must come after all required parameters)
@@ -171,6 +176,12 @@ class HybridRetriever:
         self.final_top_k_1 = final_top_k_1
         self.final_top_k_2 = final_top_k_2
         self.reranker_top_k = reranker_top_k
+        
+        # Pre-filtering parameters
+        self.reranker_prefilter_enabled = reranker_prefilter_enabled
+        self.reranker_prefilter_min_score = reranker_prefilter_min_score
+        self.reranker_prefilter_score_diff_threshold = reranker_prefilter_score_diff_threshold
+        self.reranker_prefilter_min_items = reranker_prefilter_min_items
         
         # Validate HNSW index path - must exist
         vector_hnsw_index_path_obj = Path(vector_hnsw_index_path)
@@ -298,6 +309,134 @@ class HybridRetriever:
         )
         
         return merged
+    
+    def _prefilter_items_for_reranking(
+        self,
+        query_id: str,
+        items: List[Candidates],
+        bm25_results: List[Tuple[Candidates, float]],
+        vector_results: List[Tuple[Candidates, float]],
+        use_rrf: bool,
+    ) -> List[Candidates]:
+        """
+        Pre-filter items before Cross-Encoder re-ranking based on score thresholds.
+        
+        Uses BM25/Vector/RRF scores to filter out low-quality items:
+        1. Filter by minimum score threshold (if set)
+        2. Filter by score difference threshold (if set) - truncate when score drops significantly
+        3. Ensure minimum number of items (if filtered items < min, keep top-N)
+        
+        Args:
+            query_id: Query ID for logging
+            items: List of items to filter
+            bm25_results: BM25 retrieval results with scores
+            vector_results: Vector retrieval results with scores
+            use_rrf: Whether RRF fusion was used
+            
+        Returns:
+            Filtered list of items
+        """
+        if not items:
+            return items
+        
+        # Create score maps for quick lookup
+        bm25_score_map = {item.id: score for item, score in bm25_results}
+        vector_score_map = {item.id: score for item, score in vector_results}
+        
+        # Calculate scores for each item
+        # If RRF was used, we need to recalculate RRF scores
+        # Otherwise, use max(BM25, Vector) or average
+        item_scores: List[Tuple[Candidates, float]] = []
+        for item in items:
+            bm25_score = bm25_score_map.get(item.id, 0.0)
+            vector_score = vector_score_map.get(item.id, 0.0)
+            
+            if use_rrf:
+                # Calculate RRF score (same formula as in _rrf_fusion)
+                rrf_score = 0.0
+                if item.id in bm25_score_map:
+                    bm25_rank = next(
+                        (i for i, (c, _) in enumerate(bm25_results) if c.id == item.id),
+                        len(bm25_results)
+                    )
+                    rrf_score += 1.0 / (self.rrf_k + bm25_rank + 1)
+                if item.id in vector_score_map:
+                    vector_rank = next(
+                        (i for i, (c, _) in enumerate(vector_results) if c.id == item.id),
+                        len(vector_results)
+                    )
+                    rrf_score += 1.0 / (self.rrf_k + vector_rank + 1)
+                item_score = rrf_score
+            else:
+                # Use maximum of BM25 and Vector scores, or average
+                # For consistency, use max score
+                item_score = max(bm25_score, vector_score)
+            
+            item_scores.append((item, item_score))
+        
+        # Sort by score (descending)
+        item_scores.sort(key=lambda x: x[1], reverse=True)
+        
+        # Store original sorted scores (before filtering) for fallback
+        original_item_scores = item_scores.copy()
+        
+        # Apply minimum score threshold (if set)
+        if self.reranker_prefilter_min_score is not None:
+            filtered_scores = [
+                (item, score) for item, score in item_scores
+                if score >= self.reranker_prefilter_min_score
+            ]
+            if len(filtered_scores) < len(item_scores):
+                LOGGER.info(
+                    "Query %s: Pre-filtered %d items (score < %.4f), remaining: %d",
+                    query_id, len(item_scores) - len(filtered_scores),
+                    self.reranker_prefilter_min_score, len(filtered_scores)
+                )
+                item_scores = filtered_scores
+        
+        # Apply score difference threshold (if set)
+        if self.reranker_prefilter_score_diff_threshold is not None and len(item_scores) > 1:
+            # Find the first position where score difference is too large
+            truncate_idx = len(item_scores)
+            for i in range(len(item_scores) - 1):
+                current_score = item_scores[i][1]
+                next_score = item_scores[i + 1][1]
+                score_diff = current_score - next_score
+                
+                if score_diff > self.reranker_prefilter_score_diff_threshold:
+                    truncate_idx = i + 1
+                    LOGGER.info(
+                        "Query %s: Pre-filter truncation at position %d (score drop: %.4f > %.4f threshold)",
+                        query_id, truncate_idx, score_diff, self.reranker_prefilter_score_diff_threshold
+                    )
+                    break
+            
+            item_scores = item_scores[:truncate_idx]
+        
+        # Ensure minimum number of items
+        # If filtered items < min_items, fall back to original top-N items
+        if len(item_scores) < self.reranker_prefilter_min_items:
+            # Fall back to original sorted items, take top-N
+            item_scores = original_item_scores[:self.reranker_prefilter_min_items]
+            
+            LOGGER.info(
+                "Query %s: Pre-filtered items (%d) < minimum (%d), falling back to top-%d items from original list",
+                query_id, len(item_scores), self.reranker_prefilter_min_items, self.reranker_prefilter_min_items
+            )
+        
+        # Extract items (without scores)
+        filtered_items = [item for item, _ in item_scores]
+        
+        if len(filtered_items) < len(items):
+            LOGGER.info(
+                "Query %s: Pre-filtered from %d to %d items (min_score=%s, score_diff_threshold=%s, min_items=%d)",
+                query_id, len(items), len(filtered_items),
+                self.reranker_prefilter_min_score,
+                self.reranker_prefilter_score_diff_threshold,
+                self.reranker_prefilter_min_items
+            )
+        
+        return filtered_items
     
     def _rrf_fusion(
         self,
@@ -508,6 +647,16 @@ class HybridRetriever:
                 query_id, len(merged_items), merge_time
             )
             items_for_reranking = merged_items
+        
+        # Step 3.5: Pre-filter items based on scores before Cross-Encoder re-ranking
+        if items_for_reranking and self.reranker_prefilter_enabled:
+            items_for_reranking = self._prefilter_items_for_reranking(
+                query_id=query_id,
+                items=items_for_reranking,
+                bm25_results=bm25_results,
+                vector_results=vector_results,
+                use_rrf=self.use_rrf,
+            )
         
         if not items_for_reranking:
             LOGGER.warning("Query %s: No items to re-rank", query_id)
