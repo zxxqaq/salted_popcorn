@@ -12,8 +12,9 @@ A semantic search system that matches natural language food queries to the most 
 
    ```bash
    git clone <repository-url>
+   # and then cd into the dir
    
-    cp .env.example .env
+   cp .env.example .env
    # Edit .env file with your configuration
    
    docker-compose build
@@ -37,6 +38,8 @@ Put here to specify in case you want to regenerate cache files. Make sure check 
    python scripts/generate/generate_vector_index.py
    python scripts/generate/generate_reranker_tokenization_cache.py
    exit
+   
+   # you can also check scripts/evaluation to run evaluation test
    ```
 **Run demo**
    
@@ -48,8 +51,6 @@ Put here to specify in case you want to regenerate cache files. Make sure check 
    docker-compose run --rm semantic-search bash
    # Inside container:
    python scripts/demo_query_selector.py 5
-   # Or run without arguments for interactive query selection:
-   python scripts/demo_query_selector.py
    exit
    ```
 
