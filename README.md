@@ -4,7 +4,7 @@
 
 ![](docs/imgs/arch.png)
 
-## 🧪 Test Set Construction
+## Test Set Construction
 
 1. **Query Categorization**  
    The 100 queries are categorized into four groups:  
@@ -135,12 +135,12 @@ Concurrent text retriever + vector retriever (top-50 + top-50) → RRF fusion (t
 ### Evaluation and Reflection
 
 
-| Metric | Your Result | Typical Range (Ref: MS MARCO / BEIR / MTEB) | Evaluation |
-|:--|:--:|:--:|:--:|
-| **NDCG@10** | 0.73 | 0.60–0.80 | ⭐ Good |
-| **Precision@10** | 0.50 | 0.40–0.60 | ⭐ Good |
-| **Recall@10** | 0.37 | 0.30–0.50 | ⚖️ Moderate |
-| **Latency** | 1.85s | <1s Ideal | 🐢 Slow |
+| Metric | My Result | Typical Range (Ref: MS MARCO / BEIR / MTEB) | Evaluation |
+|:--|:---------:|:--:|:----------:|
+| **NDCG@10** |   0.73    | 0.60–0.80 |    Good    |
+| **Precision@10** |   0.50    | 0.40–0.60 |    Good    |
+| **Recall@10** |   0.37    | 0.30–0.50 |  Moderate  |
+| **Latency** |   1.85s   | <1s Ideal |   Slow   |
 
 | Reference                         | Link                                                                                                 |
 |-----------------------------------|------------------------------------------------------------------------------------------------------|
