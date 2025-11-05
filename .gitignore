@@ -4,7 +4,6 @@
 .vscode/
 .venv
 
-docs
 
 # Environment variables
 .env
