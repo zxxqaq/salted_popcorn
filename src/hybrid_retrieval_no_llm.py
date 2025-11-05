@@ -15,6 +15,7 @@ from __future__ import annotations
 
 import logging
 import time
+from concurrent.futures import ThreadPoolExecutor, as_completed
 from dataclasses import dataclass
 from pathlib import Path
 from typing import Dict, List, Sequence, Tuple
@@ -114,6 +115,9 @@ class HybridRetriever:
         reranker_device: str | None = None,  # Device to use ("mps", "cuda", "cpu", or None for auto)
         reranker_batch_size: int = 32,  # Batch size for Cross-Encoder (32 or 64 recommended for Mac MPS)
         reranker_top_k: int | None = None,  # Top-K items to return from reranker (None = return all scored items)
+        reranker_tokenization_cache_dir: Path | str | None = None,  # Directory for pre-tokenization cache
+        reranker_tokenization_cache_enabled: bool = True,  # Enable pre-tokenization caching
+        reranker_max_concurrent_batches: int = 2,  # Number of batches to process concurrently
         # Query embedding parameters (optional, must come after all required parameters)
         vector_query_embedding_model: str | None = None,  # Optional: Local SentenceTransformer model for query embeddings
         # BM25 caching parameters (optional, must come after all required parameters)
@@ -241,16 +245,18 @@ class HybridRetriever:
                 "Cross-Encoder reranker is required. Install with: pip install FlagEmbedding"
             )
         try:
+            # Initialize Cross-Encoder reranker
+            # Note: LightweightReranker.__init__ will log the initialization details
             self.reranker = LightweightReranker(
                 model_name=reranker_model,
                 use_api=False,  # Use local model
                 device=reranker_device,  # "mps", "cuda", "cpu", or None
                 batch_size=reranker_batch_size,  # 32 or 64 for Mac MPS
+                tokenization_cache_dir=reranker_tokenization_cache_dir,
+                tokenization_cache_enabled=reranker_tokenization_cache_enabled,
+                max_concurrent_batches=reranker_max_concurrent_batches,
             )
-            LOGGER.info(
-                "Initialized Cross-Encoder reranker: %s (device: %s, batch_size: %d, fp16: True)",
-                reranker_model, reranker_device or "auto", reranker_batch_size
-            )
+            # No need to log here - LightweightReranker.__init__ already logs initialization
         except Exception as e:
             raise RuntimeError(
                 f"Failed to initialize Cross-Encoder reranker: {e}"
@@ -405,12 +411,65 @@ class HybridRetriever:
                 total_time=time.time() - total_start,
             )
         
-        # Step 1: BM25 retrieval (top-50)
-        LOGGER.info("Query %s: BM25 retrieval (top-%d)", query_id, self.retrieval_top_k)
-        bm25_start = time.time()
-        bm25_results = self.bm25_retriever.search(query, top_k=self.retrieval_top_k)
-        bm25_time = time.time() - bm25_start
-        LOGGER.info("Query %s: BM25 retrieved %d results in %.2fs", query_id, len(bm25_results), bm25_time)
+        # Step 1 & 2: Concurrent BM25 and Vector retrieval (top-50)
+        LOGGER.info("Query %s: Starting concurrent retrieval (BM25 + Vector, top-%d)", query_id, self.retrieval_top_k)
+        retrieval_start = time.time()
+        
+        def run_bm25_search():
+            """Run BM25 search and return results with timing."""
+            start = time.time()
+            results = self.bm25_retriever.search(query, top_k=self.retrieval_top_k)
+            elapsed = time.time() - start
+            return results, elapsed
+        
+        def run_vector_search():
+            """Run Vector search and return results with timing."""
+            start = time.time()
+            results = self.vector_retriever.search(query, top_k=self.retrieval_top_k)
+            elapsed = time.time() - start
+            return results, elapsed
+        
+        # Execute both retrievals concurrently
+        bm25_results = []
+        vector_results = []
+        bm25_time = 0.0
+        vector_time = 0.0
+        
+        with ThreadPoolExecutor(max_workers=2) as executor:
+            # Submit both tasks
+            bm25_future = executor.submit(run_bm25_search)
+            vector_future = executor.submit(run_vector_search)
+            
+            # Wait for both to complete and collect results
+            futures = {bm25_future: "bm25", vector_future: "vector"}
+            for future in as_completed(futures):
+                task_type = futures[future]
+                try:
+                    results, elapsed = future.result()
+                    if task_type == "bm25":
+                        bm25_results = results
+                        bm25_time = elapsed
+                        LOGGER.info("Query %s: BM25 retrieved %d results in %.2fs", query_id, len(bm25_results), bm25_time)
+                    else:  # vector
+                        vector_results = results
+                        vector_time = elapsed
+                        LOGGER.info("Query %s: Vector retrieved %d results in %.2fs", query_id, len(vector_results), vector_time)
+                        # Note: Vector retrieval's print statements (query embedding, HNSW search) 
+                        # may appear after this log due to output buffering in concurrent threads.
+                        # This is normal and doesn't affect functionality.
+                except Exception as e:
+                    LOGGER.error("Query %s: %s retrieval failed: %s", query_id, task_type.upper(), e)
+                    if task_type == "bm25":
+                        bm25_results = []
+                        bm25_time = 0.0
+                    else:
+                        vector_results = []
+                        vector_time = 0.0
+        
+        retrieval_elapsed = time.time() - retrieval_start
+        LOGGER.info("Query %s: Concurrent retrieval completed in %.2fs (BM25: %.2fs, Vector: %.2fs, saved: %.2fs)", 
+                    query_id, retrieval_elapsed, bm25_time, vector_time, 
+                    max(bm25_time, vector_time) - retrieval_elapsed)
         
         if len(bm25_results) < self.retrieval_top_k:
             LOGGER.warning(
@@ -426,13 +485,6 @@ class HybridRetriever:
             LOGGER.warning(
                 "  - Tokenization issues (especially for non-English queries)"
             )
-        
-        # Step 2: Vector retrieval (top-50)
-        LOGGER.info("Query %s: Vector retrieval (top-%d)", query_id, self.retrieval_top_k)
-        vector_start = time.time()
-        vector_results = self.vector_retriever.search(query, top_k=self.retrieval_top_k)
-        vector_time = time.time() - vector_start
-        LOGGER.info("Query %s: Vector retrieved %d results in %.2fs", query_id, len(vector_results), vector_time)
         
         # Step 3: Merge and deduplicate (if not using RRF) or RRF fusion (if using RRF)
         rrf_time = 0.0

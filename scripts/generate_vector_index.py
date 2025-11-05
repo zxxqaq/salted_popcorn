@@ -130,7 +130,7 @@ def main():
     print(f"   ✓ Normalize embeddings: {normalize_embeddings}")
     
     print("\n2. Loading candidates...")
-    candidates = load_food_candidates(items_path)
+    candidates, data_source_hash = load_food_candidates(items_path)
     print(f"   ✓ Loaded {len(candidates)} candidates")
     
     print("\n3. Generating embeddings and building HNSW index...")
@@ -184,7 +184,7 @@ def main():
             print(f"  • Embeddings cache: {cache_path.name}")
             print(f"  • Cache size: {cache_size_mb:.2f} MB")
     
-    print(f"  • Model: {local_model_name}")
+    print(f"  • Model: {retriever.model_name}")  # Use actual model_name from retriever
     print(f"  • Dimension: {retriever.dimensions}")
     print(f"  • Normalize: {normalize_embeddings}")
     

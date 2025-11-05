@@ -431,6 +431,24 @@ def main():
         except ValueError as e:
             raise ValueError(f"Invalid RERANKER_TOP_K value '{reranker_top_k_str}': {e}")
     
+    # Pre-tokenization cache parameters
+    reranker_tokenization_cache_dir_str = os.getenv("RERANKER_TOKENIZATION_CACHE_DIR")
+    reranker_tokenization_cache_dir = None
+    if reranker_tokenization_cache_dir_str and reranker_tokenization_cache_dir_str.strip():
+        reranker_tokenization_cache_dir = REPO_ROOT / reranker_tokenization_cache_dir_str.strip()
+    
+    reranker_tokenization_cache_enabled_str = os.getenv("RERANKER_TOKENIZATION_CACHE_ENABLED", "True").strip().lower()
+    reranker_tokenization_cache_enabled = reranker_tokenization_cache_enabled_str in ("true", "1", "yes")
+    
+    # Concurrent batch processing parameter
+    reranker_max_concurrent_batches_str = os.getenv("RERANKER_MAX_CONCURRENT_BATCHES", "2").strip()
+    try:
+        reranker_max_concurrent_batches = int(reranker_max_concurrent_batches_str)
+        if reranker_max_concurrent_batches <= 0:
+            raise ValueError(f"reranker_max_concurrent_batches must be positive, got {reranker_max_concurrent_batches}")
+    except ValueError as e:
+        raise ValueError(f"Invalid RERANKER_MAX_CONCURRENT_BATCHES value '{reranker_max_concurrent_batches_str}': {e}")
+    
     # Initialize hybrid retriever
     print("\nInitializing hybrid retriever...")
     print(f"  • BM25: k1={bm25_k1}, b={bm25_b}")
@@ -445,6 +463,7 @@ def main():
         else:
             print(f"  • Vector: {vector_model_name} (dim={vector_dimensions}) - Items & Query: API")
     print(f"  • Cross-Encoder: {reranker_model} (device={reranker_device or 'auto'}, batch_size={reranker_batch_size}, fp16=True)")
+    print(f"  • Cross-Encoder optimization: max_concurrent_batches={reranker_max_concurrent_batches}, tokenization_cache={'enabled' if reranker_tokenization_cache_enabled else 'disabled'}")
     if reranker_top_k is not None:
         print(f"  • Cross-Encoder top-K: {reranker_top_k} (will return top-{reranker_top_k} items)")
     else:
@@ -494,6 +513,9 @@ def main():
         reranker_device=reranker_device,
         reranker_batch_size=reranker_batch_size,
         reranker_top_k=reranker_top_k,
+        reranker_tokenization_cache_dir=reranker_tokenization_cache_dir,
+        reranker_tokenization_cache_enabled=reranker_tokenization_cache_enabled,
+        reranker_max_concurrent_batches=reranker_max_concurrent_batches,
         # Query embedding parameters (optional)
         vector_query_embedding_model=vector_query_embedding_model,
         # BM25 caching parameters (optional)

@@ -3,6 +3,7 @@ from __future__ import annotations
 import csv
 import json
 import os
+import sys
 import time
 from dataclasses import dataclass
 from pathlib import Path
@@ -48,6 +49,13 @@ try:
 except ImportError:
     SentenceTransformer = None  # Optional for local query embedding
     SENTENCE_TRANSFORMERS_AVAILABLE = False
+
+try:
+    from FlagEmbedding import BGEM3FlagModel
+    BGE_M3_AVAILABLE = True
+except ImportError:
+    BGEM3FlagModel = None  # Optional for bge-m3 embedding
+    BGE_M3_AVAILABLE = False
 
 # Import shared utilities
 from src.bm25_retrieval import Candidates, load_food_candidates
@@ -395,6 +403,7 @@ class VectorRetriever:
         cache_embeddings: bool = True,  # Whether to cache embeddings to disk for reuse
         # Query embedding parameters (optional, defaults to local_model_name if not set)
         query_embedding_model: str | None = None,  # Optional: Local SentenceTransformer model for query embeddings (defaults to local_model_name if not set)
+        query_embedding_device: str | None = None,  # Optional: Device for query embedding model ("cpu", "cuda", "mps", or None for auto)
     ) -> None:
         self.candidates = list(candidates)
         
@@ -412,6 +421,11 @@ class VectorRetriever:
             self.max_items_per_batch = None
             self.timeout = None
             self.sleep_between_requests = 0.0
+            
+            # IMPORTANT: Pre-initialize doc_model if we need to compute embeddings
+            # This ensures all initialization happens in __init__, not during query time
+            # However, we only initialize if we need to compute embeddings (not if loading from cache/index)
+            # This will be done later when we check if embeddings are needed
         elif api_base or api_key:
             self.use_api = True
             self.local_model_name = None
@@ -436,16 +450,62 @@ class VectorRetriever:
         
         # Store query embedding model (defaults to local_model_name if not set)
         self.query_embedding_model = query_embedding_model or local_model_name
+        self.query_embedding_device = query_embedding_device
+        
+        # Determine if using bge-m3 model
+        self.is_bge_m3 = False
+        if local_model_name and 'bge-m3' in local_model_name.lower():
+            self.is_bge_m3 = True
+            if not BGE_M3_AVAILABLE:
+                raise ImportError(
+                    "BGEM3FlagModel is required for bge-m3 model. "
+                    "Install with: pip install FlagEmbedding"
+                )
+        if self.query_embedding_model and 'bge-m3' in self.query_embedding_model.lower():
+            self.is_bge_m3 = True
+            if not BGE_M3_AVAILABLE:
+                raise ImportError(
+                    "BGEM3FlagModel is required for bge-m3 model. "
+                    "Install with: pip install FlagEmbedding"
+                )
+        
         self.query_model = None  # Will be initialized lazily if needed
         self.doc_model = None  # Will be initialized lazily if needed for local model
         
         # Pre-load query model if using local model for queries (to avoid delay on first query)
-        if self.query_embedding_model and SENTENCE_TRANSFORMERS_AVAILABLE:
-            print(f"Loading query embedding model: {self.query_embedding_model}")
-            model_load_start = time.time()
-            self.query_model = SentenceTransformer(self.query_embedding_model)
-            model_load_time = time.time() - model_load_start
-            print(f"✓ Query embedding model loaded in {model_load_time:.2f}s")
+        if self.query_embedding_model:
+            if self.is_bge_m3:
+                # Use BGEM3FlagModel for bge-m3
+                print(f"Loading query embedding model (bge-m3): {self.query_embedding_model}")
+                model_load_start = time.time()
+                self.query_model = BGEM3FlagModel(self.query_embedding_model)
+                model_load_time = time.time() - model_load_start
+                print(f"✓ Query embedding model (bge-m3) loaded in {model_load_time:.2f}s")
+                
+                # Warmup: Run a dummy query to initialize model internals and move to GPU if available
+                # This significantly speeds up subsequent queries
+                print(f"  Warming up query model (first encode may be slow)...")
+                warmup_start = time.time()
+                try:
+                    _ = self.query_model.encode(
+                        ["warmup query"],
+                        return_dense=True,
+                        return_sparse=False,
+                        return_colbert_vecs=False
+                    )
+                    warmup_time = time.time() - warmup_start
+                    print(f"  ✓ Query model warmup completed in {warmup_time:.2f}s")
+                    if warmup_time > 2.0:
+                        print(f"    ⚠ Warmup took {warmup_time:.2f}s - model may be running on CPU")
+                        print(f"    Consider using GPU/MPS acceleration if available")
+                except Exception as e:
+                    print(f"  ⚠ Query model warmup failed (non-critical): {e}")
+            elif SENTENCE_TRANSFORMERS_AVAILABLE:
+                print(f"Loading query embedding model: {self.query_embedding_model}")
+                model_load_start = time.time()
+                self.query_model = SentenceTransformer(self.query_embedding_model)
+                model_load_time = time.time() - model_load_start
+                print(f"✓ Query embedding model loaded in {model_load_time:.2f}s")
         
         # Determine index path: handle both file path and directory path
         if index_path is None:
@@ -516,7 +576,9 @@ class VectorRetriever:
                     if dimension is None:
                         if self.local_model_name:
                             # For local models, try common dimensions based on model name
-                            if 'minilm' in self.local_model_name.lower() and 'l12' in self.local_model_name.lower():
+                            if 'bge-m3' in self.local_model_name.lower():
+                                dimension = 1024  # BAAI/bge-m3 dense vector dimension
+                            elif 'minilm' in self.local_model_name.lower() and 'l12' in self.local_model_name.lower():
                                 dimension = 384  # paraphrase-multilingual-MiniLM-L12-v2
                             elif 'multilingual' in self.local_model_name.lower():
                                 dimension = 384  # Common for multilingual models
@@ -649,61 +711,151 @@ class VectorRetriever:
                 embeddings_loaded = True
                 
             elif self.local_model_name:
-                # Local model mode - compute embeddings using SentenceTransformer
-                if not SENTENCE_TRANSFORMERS_AVAILABLE:
-                    raise ImportError(
-                        "SentenceTransformer is required for local model embeddings. "
-                        "Install with: pip install sentence-transformers"
-                    )
-                
-                # Initialize local model if not already initialized
-                if self.doc_model is None:
-                    print(f"Loading local embedding model: {self.local_model_name}")
-                    model_load_start = time.time()
-                    self.doc_model = SentenceTransformer(self.local_model_name)
-                    model_load_time = time.time() - model_load_start
-                    print(f"✓ Local model loaded in {model_load_time:.2f}s")
+                # Local model mode - compute embeddings using SentenceTransformer or BGEM3FlagModel
+                if self.is_bge_m3:
+                    # Use BGEM3FlagModel for bge-m3
+                    if not BGE_M3_AVAILABLE:
+                        raise ImportError(
+                            "BGEM3FlagModel is required for bge-m3 model. "
+                            "Install with: pip install FlagEmbedding"
+                        )
                     
-                    # Get dimension from model
-                    # Create a dummy embedding to get dimension
-                    test_embedding = self.doc_model.encode(["test"], normalize_embeddings=normalize_embeddings)[0]
-                    self.dimensions = len(test_embedding)
-                    print(f"  Model dimension: {self.dimensions}")
-                
-                # Pre-compute document embeddings using local model
-                texts = [doc.text for doc in self.candidates]
-                print(f"Computing embeddings for {len(texts)} documents using local model...")
-                print(f"  Model: {self.local_model_name}")
-                print(f"  Dimension: {self.dimensions}")
-                
-                # Process in batches for better performance (local model can handle large batches)
-                # Use a reasonable batch size for local processing
-                batch_size = 32  # Process 32 items at a time
-                all_embeddings = []
-                
-                for i in range(0, len(texts), batch_size):
-                    batch_texts = texts[i:i + batch_size]
-                    batch_num = (i // batch_size) + 1
-                    total_batches = (len(texts) + batch_size - 1) // batch_size
-                    print(f"  Processing batch {batch_num}/{total_batches}: {len(batch_texts)} items")
+                    # Initialize bge-m3 model if not already initialized
+                    # This should only happen during __init__ when computing embeddings
+                    # NOT during query time
+                    if self.doc_model is None:
+                        print(f"Loading local embedding model (bge-m3): {self.local_model_name}")
+                        model_load_start = time.time()
+                        self.doc_model = BGEM3FlagModel(self.local_model_name)
+                        model_load_time = time.time() - model_load_start
+                        print(f"✓ Local model (bge-m3) loaded in {model_load_time:.2f}s")
+                        
+                        # Warmup doc_model as well to avoid first-encode overhead
+                        print(f"  Warming up document embedding model...")
+                        warmup_start = time.time()
+                        try:
+                            _ = self.doc_model.encode(
+                                ["warmup document"],
+                                return_dense=True,
+                                return_sparse=False,
+                                return_colbert_vecs=False
+                            )
+                            warmup_time = time.time() - warmup_start
+                            print(f"  ✓ Document model warmup completed in {warmup_time:.2f}s")
+                        except Exception as e:
+                            print(f"  ⚠ Document model warmup failed (non-critical): {e}")
+                        
+                        # Get dimension from model
+                        # Create a dummy embedding to get dimension
+                        test_result = self.doc_model.encode(
+                            ["test"],
+                            return_dense=True,
+                            return_sparse=False,
+                            return_colbert_vecs=False
+                        )
+                        test_embedding = test_result['dense_vecs'][0]
+                        self.dimensions = len(test_embedding)
+                        print(f"  Model dimension: {self.dimensions}")
                     
-                    batch_embeddings = self.doc_model.encode(
-                        batch_texts,
-                        normalize_embeddings=normalize_embeddings,
-                        show_progress_bar=False
-                    )
-                    all_embeddings.append(batch_embeddings)
-                
-                # Concatenate all batches
-                self.doc_embeddings = np.vstack(all_embeddings)
-                print(f"Embeddings computed. Shape: {self.doc_embeddings.shape}")
-                
-                # Save embeddings cache if enabled
-                if self.cache_embeddings and self.embeddings_dir:
-                    self._save_cached_embeddings(self.model_name, self.dimensions)
-                
-                # Mark embeddings as loaded
-                embeddings_loaded = True
+                    # Pre-compute document embeddings using bge-m3
+                    texts = [doc.text for doc in self.candidates]
+                    print(f"Computing embeddings for {len(texts)} documents using bge-m3...")
+                    print(f"  Model: {self.local_model_name}")
+                    print(f"  Dimension: {self.dimensions}")
+                    
+                    # Process in batches for better performance
+                    batch_size = 32  # Process 32 items at a time
+                    all_embeddings = []
+                    
+                    for i in range(0, len(texts), batch_size):
+                        batch_texts = texts[i:i + batch_size]
+                        batch_num = (i // batch_size) + 1
+                        total_batches = (len(texts) + batch_size - 1) // batch_size
+                        print(f"  Processing batch {batch_num}/{total_batches}: {len(batch_texts)} items")
+                        
+                        batch_result = self.doc_model.encode(
+                            batch_texts,
+                            return_dense=True,
+                            return_sparse=False,
+                            return_colbert_vecs=False
+                        )
+                        batch_embeddings = batch_result['dense_vecs']
+                        all_embeddings.append(batch_embeddings)
+                    
+                    # Concatenate all batches
+                    self.doc_embeddings = np.vstack(all_embeddings)
+                    print(f"Embeddings computed. Shape: {self.doc_embeddings.shape}")
+                    
+                    # Normalize if requested
+                    if normalize_embeddings:
+                        norms = np.linalg.norm(self.doc_embeddings, axis=1, keepdims=True)
+                        norms = np.where(norms == 0, 1, norms)  # Avoid division by zero
+                        self.doc_embeddings = self.doc_embeddings / norms
+                    
+                    # Save embeddings cache if enabled
+                    if self.cache_embeddings and self.embeddings_dir:
+                        self._save_cached_embeddings(self.model_name, self.dimensions)
+                    
+                    # Mark embeddings as loaded
+                    embeddings_loaded = True
+                else:
+                    # Use SentenceTransformer for other local models
+                    if not SENTENCE_TRANSFORMERS_AVAILABLE:
+                        raise ImportError(
+                            "SentenceTransformer is required for local model embeddings. "
+                            "Install with: pip install sentence-transformers"
+                        )
+                    
+                    # Initialize local model if not already initialized
+                    # This should only happen during __init__ when computing embeddings
+                    # NOT during query time
+                    if self.doc_model is None:
+                        print(f"Loading local embedding model: {self.local_model_name}")
+                        model_load_start = time.time()
+                        self.doc_model = SentenceTransformer(self.local_model_name)
+                        model_load_time = time.time() - model_load_start
+                        print(f"✓ Local model loaded in {model_load_time:.2f}s")
+                        
+                        # Get dimension from model
+                        # Create a dummy embedding to get dimension
+                        test_embedding = self.doc_model.encode(["test"], normalize_embeddings=normalize_embeddings)[0]
+                        self.dimensions = len(test_embedding)
+                        print(f"  Model dimension: {self.dimensions}")
+                    
+                    # Pre-compute document embeddings using local model
+                    texts = [doc.text for doc in self.candidates]
+                    print(f"Computing embeddings for {len(texts)} documents using local model...")
+                    print(f"  Model: {self.local_model_name}")
+                    print(f"  Dimension: {self.dimensions}")
+                    
+                    # Process in batches for better performance (local model can handle large batches)
+                    # Use a reasonable batch size for local processing
+                    batch_size = 32  # Process 32 items at a time
+                    all_embeddings = []
+                    
+                    for i in range(0, len(texts), batch_size):
+                        batch_texts = texts[i:i + batch_size]
+                        batch_num = (i // batch_size) + 1
+                        total_batches = (len(texts) + batch_size - 1) // batch_size
+                        print(f"  Processing batch {batch_num}/{total_batches}: {len(batch_texts)} items")
+                        
+                        batch_embeddings = self.doc_model.encode(
+                            batch_texts,
+                            normalize_embeddings=normalize_embeddings,
+                            show_progress_bar=False
+                        )
+                        all_embeddings.append(batch_embeddings)
+                    
+                    # Concatenate all batches
+                    self.doc_embeddings = np.vstack(all_embeddings)
+                    print(f"Embeddings computed. Shape: {self.doc_embeddings.shape}")
+                    
+                    # Save embeddings cache if enabled
+                    if self.cache_embeddings and self.embeddings_dir:
+                        self._save_cached_embeddings(self.model_name, self.dimensions)
+                    
+                    # Mark embeddings as loaded
+                    embeddings_loaded = True
                 
             else:
                 # This should never happen
@@ -817,15 +969,26 @@ class VectorRetriever:
         
         # Save index
         # Use explicit path if provided, otherwise generate from directory
-        if self.index_path is not None:
+        # IMPORTANT: Always use auto-generated path based on actual model_name and dimensions
+        # to ensure filename matches the actual model and dimensions used
+        if self.index_path is not None and self.index_path.suffix == ".index":
+            # If explicit file path is provided, use it (but warn if it doesn't match model)
             save_path = self.index_path
+            # Generate expected path to check if they match
+            expected_path = self._get_index_path(self.model_name, self.dimensions, num_docs)
+            if expected_path and save_path.name != expected_path.name:
+                print(f"  ⚠ Warning: Index file path '{save_path.name}' doesn't match expected name '{expected_path.name}'")
+                print(f"     Expected: model={self.model_name}, dim={self.dimensions}")
+                print(f"     Consider using auto-generated path or updating VECTOR_HNSW_INDEX_PATH")
         else:
+            # Auto-generate path based on actual model_name and dimensions
             save_path = self._get_index_path(self.model_name, self.dimensions, num_docs)
         
         if save_path:
             try:
                 self.hnsw_index.save_index(str(save_path))
                 print(f"  ✓ HNSW index saved to: {save_path.name}")
+                print(f"     Model: {self.model_name}, Dimension: {self.dimensions}")
             except Exception as e:
                 print(f"  ⚠ Failed to save index: {e}")
     
@@ -846,27 +1009,69 @@ class VectorRetriever:
         # Encode query
         # Use local model for query embedding if specified, otherwise use API
         if self.query_embedding_model:
-            # Use local SentenceTransformer model for query embedding
-            if not SENTENCE_TRANSFORMERS_AVAILABLE:
-                raise ImportError(
-                    "SentenceTransformer is required for local query embedding. "
-                    "Install with: pip install sentence-transformers"
-                )
-            
             # Query model should already be loaded in __init__, but check just in case
             if self.query_model is None:
                 # Fallback: lazy initialization if somehow not loaded
-                print(f"  Loading local query embedding model: {self.query_embedding_model}")
-                query_embedding_start = time.time()
-                self.query_model = SentenceTransformer(self.query_embedding_model)
-                load_time = time.time() - query_embedding_start
-                print(f"  ✓ Local query model loaded in {load_time:.2f}s")
+                # This should not happen if __init__ completed successfully
+                print(f"  ⚠ Warning: Query model not initialized. Loading now (this should not happen)...")
+                if self.is_bge_m3:
+                    print(f"  Loading local query embedding model (bge-m3): {self.query_embedding_model}")
+                    model_load_start = time.time()
+                    self.query_model = BGEM3FlagModel(self.query_embedding_model)
+                    model_load_time = time.time() - model_load_start
+                    print(f"  ✓ Local query model (bge-m3) loaded in {model_load_time:.2f}s")
+                else:
+                    if not SENTENCE_TRANSFORMERS_AVAILABLE:
+                        raise ImportError(
+                            "SentenceTransformer is required for local query embedding. "
+                            "Install with: pip install sentence-transformers"
+                        )
+                    print(f"  Loading local query embedding model: {self.query_embedding_model}")
+                    model_load_start = time.time()
+                    self.query_model = SentenceTransformer(self.query_embedding_model)
+                    model_load_time = time.time() - model_load_start
+                    print(f"  ✓ Local query model loaded in {model_load_time:.2f}s")
             
+            # Start timing AFTER any potential lazy initialization
+            # This ensures query time only measures actual encoding, not model loading
             query_embedding_start = time.time()
-            query_embedding = self.query_model.encode([query], normalize_embeddings=self.normalize_embeddings)[0]
-            query_embedding_time = time.time() - query_embedding_start
-            print(f"  Query embedding (local model) completed in {query_embedding_time:.3f}s")
-            query_embedding = np.array(query_embedding)
+            if self.is_bge_m3:
+                # Use BGEM3FlagModel for bge-m3
+                # Note: BGEM3FlagModel may have overhead on first encode after model load
+                # The warmup in __init__ should help, but first real query may still be slower
+                encode_start = time.time()
+                query_result = self.query_model.encode(
+                    [query],
+                    return_dense=True,
+                    return_sparse=False,
+                    return_colbert_vecs=False
+                )
+                encode_time = time.time() - encode_start
+                query_embedding = query_result['dense_vecs'][0]
+                
+                # Convert to numpy array
+                array_start = time.time()
+                query_embedding = np.array(query_embedding)
+                array_time = time.time() - array_start
+                
+                query_embedding_time = time.time() - query_embedding_start
+                if query_embedding_time > 1.0:  # Warn if query embedding takes more than 1 second
+                    print(f"  Query embedding (local model) completed in {query_embedding_time:.3f}s")
+                    print(f"    Breakdown: encode={encode_time:.3f}s, array_conversion={array_time:.3f}s")
+                    print(f"    ⚠ Slow query embedding detected. Consider:")
+                    print(f"      - Using GPU/MPS acceleration if available")
+                    print(f"      - Batch processing multiple queries together")
+                    sys.stdout.flush()  # Ensure output is flushed immediately (important for concurrent execution)
+                else:
+                    print(f"  Query embedding (local model) completed in {query_embedding_time:.3f}s")
+                    sys.stdout.flush()  # Ensure output is flushed immediately (important for concurrent execution)
+            else:
+                # Use SentenceTransformer for other models
+                query_embedding = self.query_model.encode([query], normalize_embeddings=self.normalize_embeddings)[0]
+                query_embedding_time = time.time() - query_embedding_start
+                print(f"  Query embedding (local model) completed in {query_embedding_time:.3f}s")
+                sys.stdout.flush()  # Ensure output is flushed immediately (important for concurrent execution)
+                query_embedding = np.array(query_embedding)
             
             # Check dimension mismatch (query embedding vs document embeddings) - CRITICAL
             query_dim = len(query_embedding)
@@ -905,6 +1110,7 @@ class VectorRetriever:
             )
             query_embedding_time = time.time() - query_embedding_start
             print(f"  Query embedding API call completed in {query_embedding_time:.2f}s")
+            sys.stdout.flush()  # Ensure output is flushed immediately (important for concurrent execution)
             query_embedding = np.array(query_embeddings[0])
             
             # Normalize if requested
@@ -932,6 +1138,7 @@ class VectorRetriever:
             labels, distances = self.hnsw_index.knn_query(query_vec, k=top_k)
             hnsw_search_time = time.time() - hnsw_search_start
             print(f"  HNSW search completed in {hnsw_search_time:.3f}s")
+            sys.stdout.flush()  # Ensure output is flushed immediately (important for concurrent execution)
             
             # Convert distances to similarity scores
             # For cosine similarity: distance = 1 - similarity, so similarity = 1 - distance
