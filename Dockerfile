@@ -31,6 +31,3 @@ RUN mkdir -p data/raw data/test data/bm25_cache_5k \
 ENV PYTHONUNBUFFERED=1
 ENV RERANKER_DEVICE=cpu
 
-# Default command (can be overridden in docker-compose or run command)
-CMD ["python", "scripts/demo_query_selector.py", "1"]
-
