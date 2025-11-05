@@ -554,23 +554,93 @@ class VectorRetriever:
         if self.use_hnsw:
             # Try to load existing index first
             # Use explicit path if provided, otherwise generate from directory
+            
+            # For local models, we need to determine dimension first to generate correct cache path
+            # Try to infer dimension from existing cache files or model name
+            inferred_dimension = self.dimensions
+            if inferred_dimension is None and self.local_model_name:
+                # Try loading cached embeddings first to get dimension
+                if self.cache_embeddings and self.embeddings_dir:
+                    # Try common dimensions for the model
+                    if 'bge-m3' in self.local_model_name.lower():
+                        inferred_dimension = 1024
+                    elif 'minilm' in self.local_model_name.lower() and 'l12' in self.local_model_name.lower():
+                        inferred_dimension = 384
+                    elif 'multilingual' in self.local_model_name.lower():
+                        inferred_dimension = 384
+                    else:
+                        inferred_dimension = 768
+                    # Try to load actual cached embeddings to get exact dimension
+                    for test_dim in [1024, 384, 768, 1536]:
+                        test_cache = self._get_embeddings_cache_path(self.model_name, test_dim, len(candidates))
+                        if test_cache and test_cache.exists():
+                            try:
+                                test_emb = np.load(str(test_cache))
+                                inferred_dimension = test_emb.shape[1]
+                                print(f"  Found cached embeddings, inferred dimension: {inferred_dimension}")
+                                break
+                            except:
+                                pass
+            
+            # Determine the actual index file path to check
             if self.index_path is not None:
-                index_path_obj = self.index_path
+                # Explicit index path was provided (could be file or directory)
+                index_path_obj = Path(self.index_path)
+                if index_path_obj.exists() and index_path_obj.is_file():
+                    # Explicit file path provided and exists
+                    print(f"  Using explicit index file: {index_path_obj.name}")
+                elif index_path_obj.exists() and index_path_obj.is_dir():
+                    # Directory provided, generate filename based on model and dimensions
+                    generated_path = self._get_index_path(self.model_name, inferred_dimension, len(candidates))
+                    if generated_path:
+                        # Use the provided directory, but with generated filename
+                        index_path_obj = index_path_obj / generated_path.name
+                        print(f"  Generated index path from directory: {index_path_obj.name} (model={self.model_name}, dim={inferred_dimension}, docs={len(candidates)})")
+                    else:
+                        index_path_obj = None
+                else:
+                    # Path doesn't exist yet
+                    if index_path_obj.suffix == ".index":
+                        # Looks like a file path, but doesn't exist yet
+                        print(f"  Index file path provided but doesn't exist: {index_path_obj.name}")
+                        index_path_obj = None
+                    else:
+                        # Treat as directory that will be created, generate filename
+                        generated_path = self._get_index_path(self.model_name, inferred_dimension, len(candidates))
+                        if generated_path:
+                            index_path_obj = index_path_obj / generated_path.name
+                            print(f"  Will create index at: {index_path_obj.name}")
+                        else:
+                            index_path_obj = None
+            elif self.index_dir is not None:
+                # No explicit index path, but index_dir is set, generate filename
+                index_path_obj = self._get_index_path(self.model_name, inferred_dimension, len(candidates))
+                if index_path_obj:
+                    # Update to use index_dir instead of default directory
+                    index_path_obj = self.index_dir / index_path_obj.name
+                    print(f"  Generated index path: {index_path_obj.name} (model={self.model_name}, dim={inferred_dimension}, docs={len(candidates)})")
             else:
-                # Use model_name for index path generation (works for both API and local models)
-                index_path_obj = self._get_index_path(self.model_name, self.dimensions, len(candidates))
+                # No index path or dir specified, use default
+                index_path_obj = self._get_index_path(self.model_name, inferred_dimension, len(candidates))
+                if index_path_obj:
+                    print(f"  Generated index path: {index_path_obj.name} (model={self.model_name}, dim={inferred_dimension}, docs={len(candidates)})")
             
             if index_path_obj and index_path_obj.exists():
                 try:
-                    # Try to get dimension: use provided dimensions, or try to infer from embeddings cache
+                    # Try to get dimension: use provided dimensions, or inferred dimension, or try to infer from embeddings cache
                     dimension = None
                     if self.dimensions:
                         dimension = self.dimensions
+                    elif inferred_dimension:
+                        dimension = inferred_dimension
                     elif self.cache_embeddings and self.embeddings_dir:
                         # Try loading cached embeddings to get dimension
-                        cached_embeddings = self._load_cached_embeddings(self.model_name, self.dimensions, len(candidates))
-                        if cached_embeddings is not None:
-                            dimension = cached_embeddings.shape[1]
+                        # Try common dimensions
+                        for test_dim in [1024, 384, 768, 1536]:
+                            cached_embeddings = self._load_cached_embeddings(self.model_name, test_dim, len(candidates))
+                            if cached_embeddings is not None:
+                                dimension = cached_embeddings.shape[1]
+                                break
                     
                     # If still no dimension, try to infer from model name
                     if dimension is None:
@@ -615,9 +685,10 @@ class VectorRetriever:
                     # Only need candidates for mapping results back to documents
                     self.doc_embeddings = None
                     embeddings_loaded = True  # Mark as "loaded" to skip computation
+                    print(f"  ✓ Skipping document embedding computation (using cached HNSW index)")
                 except Exception as e:
                     print(f"  ⚠ Failed to load index: {e}")
-                    print(f"     Will rebuild index...")
+                    print(f"     Will try to load cached embeddings or rebuild...")
                     self.hnsw_index = None
         
         # Only load embeddings if:
@@ -626,14 +697,29 @@ class VectorRetriever:
         if not embeddings_loaded and not index_loaded:
             # Try to load cached embeddings first
             if self.cache_embeddings and self.embeddings_dir:
-                cached_embeddings = self._load_cached_embeddings(self.model_name, self.dimensions, len(candidates))
+                # Try to find cached embeddings by testing common dimensions
+                cached_embeddings = None
+                if self.dimensions:
+                    # Try with provided dimension first
+                    cached_embeddings = self._load_cached_embeddings(self.model_name, self.dimensions, len(candidates))
+                
+                if cached_embeddings is None:
+                    # Try common dimensions if not found
+                    for test_dim in [1024, 384, 768, 1536, 3072]:
+                        cached_embeddings = self._load_cached_embeddings(self.model_name, test_dim, len(candidates))
+                        if cached_embeddings is not None:
+                            break
+                
                 if cached_embeddings is not None:
                     self.doc_embeddings = cached_embeddings
                     # Update dimensions from cached embeddings
                     if self.dimensions is None:
                         self.dimensions = cached_embeddings.shape[1]
                     print(f"✓ Loaded cached embeddings. Shape: {self.doc_embeddings.shape}")
+                    print(f"  ✓ Skipping document embedding computation (using cached embeddings)")
                     embeddings_loaded = True
+                else:
+                    print(f"  ⚠ No cached embeddings found, will compute new embeddings")
         
         if not embeddings_loaded and not index_loaded:
             if self.use_api:

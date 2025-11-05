@@ -77,3 +77,19 @@ If you want to run the experiments yourself, execute the scripts under `scripts/
 | **@K=10** | 0.9633 | 0.1177 | 0.6225 | 0.1160 |
 
 ### Vector Retriever
+
+
+| Model name                                                      | Average (ms) | Max (ms) | Min (ms) |
+|-----------------------------------------------------------------|:-------------:|:--------:|:--------:|
+| **BAAI/bge-m3**                                                 | 46.95 | 89.88 | 33.89 |
+| **sentence-transformers/paraphrase-multilingual-MiniLM-L12-v2** | 109.62 | 510.61 | 7.45 |
+
+| Model name | Metric | Precision | Recall | NDCG | Coverage |
+|------------|:--------|:----------:|:-------:|:------:|:----------:|
+|      **BAAI/bge-m3**          | **@K=5**  | 0.9800 | 0.0598 | 0.6697 | 0.0580 |
+|      **BAAI/bge-m3**          | **@K=10** | 0.9833 | 0.1202 | 0.6963 | 0.1184 |
+|       **sentence-transformers/paraphrase-multilingual-MiniLM-L12-v2**                        | **@K=5**  | 0.4667 | 0.0286 | 0.3351 | 0.0268 |
+|       **sentence-transformers/paraphrase-multilingual-MiniLM-L12-v2**                        | **@K=10** | 0.3867 | 0.0478 | 0.3125 | 0.0461 |
+
+I also tried both text-embedding-3-small and text-embedding-3-large, but embedding through the API takes around 1 second per query, which is too slow. It also depends on the network speed and OpenAI’s service performance, and the token usage is billed, making it quite expensive for large-scale datasets and high concurrency queries.
+

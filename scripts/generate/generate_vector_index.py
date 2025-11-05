@@ -64,7 +64,7 @@ def main():
     print(f"   ✓ Items file: {items_path}")
     
     # Index path (directory or file)
-    index_path_str = os.getenv("VECTOR_HNSW_INDEX_PATH")
+    index_path_str = "data/vector_indices_5k"
     if not index_path_str or not index_path_str.strip():
         # Default: use data/vector_indices directory, auto-generate filename
         index_path = project_root / "data" / "vector_indices"
