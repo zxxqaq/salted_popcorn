@@ -1,0 +1,29 @@
+version: '3.8'
+
+services:
+  semantic-search:
+    build: .
+    container_name: food-semantic-search
+    volumes:
+      # Mount data directory (read-only for data files, read-write for cache)
+      - ./data:/app/data
+      # Mount artifacts directory for evaluation reports
+      - ./artifacts:/app/artifacts
+      # Mount .env file (if exists)
+      - ./.env:/app/.env:ro
+    environment:
+      # Override device if needed (cpu for Docker, cuda if GPU available)
+      - RERANKER_DEVICE=${RERANKER_DEVICE:-cpu}
+    # Resource limits (adjust based on your needs)
+    deploy:
+      resources:
+        limits:
+          memory: 8G
+        reservations:
+          memory: 4G
+    # Keep container running for interactive use
+    stdin_open: true
+    tty: true
+    # Command to run (can be overridden)
+    command: python scripts/demo_query_selector.py 1
+

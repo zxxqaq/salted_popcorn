@@ -1,0 +1,49 @@
+# Python
+__pycache__/
+*.py[cod]
+*$py.class
+*.so
+.Python
+venv/
+env/
+ENV/
+.venv
+
+# IDE
+.idea/
+.vscode/
+*.swp
+*.swo
+*~
+
+# OS
+.DS_Store
+Thumbs.db
+
+# Git
+.git/
+.gitignore
+
+# Environment
+.env
+.env.local
+
+# Documentation
+*.md
+docs/
+
+# Cache and artifacts (will be mounted as volumes)
+# data/bm25_cache_5k/
+# data/vector_indices_5k/
+# data/reranker_tokenization_cache_5k/
+# artifacts/
+
+# Test files
+*.test
+*.spec
+
+# Docker
+Dockerfile*
+docker-compose*.yml
+.dockerignore
+
