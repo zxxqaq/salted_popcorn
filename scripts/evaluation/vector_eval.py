@@ -8,7 +8,7 @@ This script:
 4. Generates comprehensive evaluation report
 
 Evaluation metrics:
-- Precision@K, Recall@K, NDCG@K, MRR, Coverage@K
+- Precision@K, Recall@K, NDCG@K, MRR
 - Average/Max/Min latency
 - Per-query results and ground truth comparison
 """
@@ -61,7 +61,7 @@ def main():
     
     # Option 1: Local model mode (recommended for evaluation)
     use_local_model = True
-    local_model_name = "sentence-transformers/paraphrase-multilingual-MiniLM-L12-v2"  # or "sentence-transformers/paraphrase-multilingual-MiniLM-L12-v2"
+    local_model_name = "BAAI/bge-m3"  # or "sentence-transformers/paraphrase-multilingual-MiniLM-L12-v2"
     normalize_embeddings = True
     
     # Option 2: API mode (if you want to use OpenAI API)
@@ -98,7 +98,7 @@ def main():
     k_values = [5, 10]  # K values for metrics (Precision@K, Recall@K, etc.)
     
     # Output path
-    output_report_path = REPO_ROOT / "artifacts" / "eval_runs" / "vector_eval_report_paraphrase_multilingual_MiniLM_L12_v2.txt"
+    output_report_path = REPO_ROOT / "artifacts" / "eval_runs" / "vector_eval_report_BAAI_bge_m3.txt"
     
     # ============================================================================
     # Evaluation pipeline
@@ -285,13 +285,11 @@ def main():
         precisions = [r['metrics'][f'precision@{k}'] for r in results]
         recalls = [r['metrics'][f'recall@{k}'] for r in results]
         ndcgs = [r['metrics'][f'ndcg@{k}'] for r in results]
-        coverages = [r['metrics'][f'coverage@{k}'] for r in results]
         
         print(f"\nMetrics @ K={k}:")
         print(f"  Precision@{k}: {sum(precisions)/len(precisions):.4f}")
         print(f"  Recall@{k}:    {sum(recalls)/len(recalls):.4f}")
         print(f"  NDCG@{k}:      {sum(ndcgs)/len(ndcgs):.4f}")
-        print(f"  Coverage@{k}:  {sum(coverages)/len(coverages):.4f}")
     
     mrr_values = [r['metrics']['mrr'] for r in results]
     print(f"\nMRR: {sum(mrr_values)/len(mrr_values):.4f}")

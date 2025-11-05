@@ -2,7 +2,7 @@
 """Common evaluation utilities for retrieval evaluation.
 
 This module provides reusable functions for:
-- Evaluation metrics (Precision@K, Recall@K, NDCG@K, MRR, Coverage@K)
+- Evaluation metrics (Precision@K, Recall@K, NDCG@K, MRR)
 - Report generation
 - System information collection
 - Data loading utilities
@@ -12,12 +12,34 @@ from __future__ import annotations
 
 import csv
 import math
+import os
 import platform
 import sys
 from pathlib import Path
 from typing import Dict, List, Tuple
 
+# Load environment variables from .env file if available
+try:
+    from dotenv import load_dotenv
+    load_dotenv()
+except ImportError:
+    # dotenv is optional, continue without it
+    pass
+
 from src.bm25_retrieval import Candidates
+
+
+# ============================================================================
+# Relevance Threshold Configuration
+# ============================================================================
+
+# Relevance threshold: items with score >= RELEVANCE_THRESHOLD are considered relevant
+# Can be set via environment variable RELEVANCE_THRESHOLD, default is 5.0
+RELEVANCE_THRESHOLD = float(os.getenv("RELEVANCE_THRESHOLD", "5.0"))
+
+# NDCG threshold: items with score >= NDCG_THRESHOLD are used for IDCG calculation
+# Can be set via environment variable NDCG_THRESHOLD, default is 1.0
+NDCG_THRESHOLD = float(os.getenv("NDCG_THRESHOLD", "1.0"))
 
 
 # ============================================================================
@@ -88,7 +110,7 @@ def precision_at_k(retrieved_items: List[str], ground_truth_items: List[str], k:
     
     Args:
         retrieved_items: List of retrieved item IDs (top-K)
-        ground_truth_items: List of relevant item IDs (score > 0)
+        ground_truth_items: List of relevant item IDs (score >= RELEVANCE_THRESHOLD)
         k: Cutoff position
         
     Returns:
@@ -103,24 +125,32 @@ def precision_at_k(retrieved_items: List[str], ground_truth_items: List[str], k:
     return relevant_retrieved / k
 
 
-def recall_at_k(retrieved_items: List[str], ground_truth_items: List[str], k: int) -> float:
+def recall_at_k(retrieved_items: List[str], ground_truth: Dict[str, float], k: int) -> float:
     """Calculate Recall@K.
+    
+    Recall@K = (retrieved relevant items in top-K) / (ground truth top-K relevant items)
     
     Args:
         retrieved_items: List of retrieved item IDs (top-K)
-        ground_truth_items: List of relevant item IDs (score > 0)
+        ground_truth: Dictionary mapping item_id to relevance score
         k: Cutoff position
         
     Returns:
         Recall@K value
     """
-    if len(ground_truth_items) == 0:
+    # Get top-K relevant items from ground truth (sorted by score descending)
+    relevant_items = [(item_id, score) for item_id, score in ground_truth.items() 
+                     if score >= RELEVANCE_THRESHOLD]
+    relevant_items.sort(key=lambda x: x[1], reverse=True)
+    ground_truth_top_k_items = [item_id for item_id, _ in relevant_items[:k]]
+    
+    if len(ground_truth_top_k_items) == 0:
         return 0.0
     
     retrieved_k = retrieved_items[:k]
-    relevant_retrieved = sum(1 for item_id in retrieved_k if item_id in ground_truth_items)
+    relevant_retrieved = sum(1 for item_id in retrieved_k if item_id in ground_truth_top_k_items)
     
-    return relevant_retrieved / len(ground_truth_items)
+    return relevant_retrieved / len(ground_truth_top_k_items)
 
 
 def dcg_at_k(scores: List[float], k: int) -> float:
@@ -169,7 +199,8 @@ def ndcg_at_k(retrieved_items: List[str], retrieved_scores: List[float],
     dcg = dcg_at_k(relevance_scores, k)
     
     # Calculate IDCG@K (ideal DCG)
-    ideal_scores = sorted([score for score in ground_truth.values() if score > 0], reverse=True)
+    # Use NDCG_THRESHOLD (default 1.0) for IDCG calculation, not RELEVANCE_THRESHOLD
+    ideal_scores = sorted([score for score in ground_truth.values() if score >= NDCG_THRESHOLD], reverse=True)
     idcg = dcg_at_k(ideal_scores, k)
     
     if idcg == 0.0:
@@ -183,7 +214,7 @@ def mrr(retrieved_items: List[str], ground_truth_items: List[str]) -> float:
     
     Args:
         retrieved_items: List of retrieved item IDs
-        ground_truth_items: List of relevant item IDs (score > 0)
+        ground_truth_items: List of relevant item IDs (score >= RELEVANCE_THRESHOLD)
         
     Returns:
         MRR value
@@ -203,7 +234,7 @@ def coverage_at_k(retrieved_items: List[str], ground_truth_items: List[str], k: 
     
     Args:
         retrieved_items: List of retrieved item IDs (top-K)
-        ground_truth_items: List of relevant item IDs (score > 0)
+        ground_truth_items: List of relevant item IDs (score >= RELEVANCE_THRESHOLD)
         k: Cutoff position
         
     Returns:
@@ -243,23 +274,22 @@ def evaluate_query(
     Returns:
         Dictionary with evaluation metrics and results
     """
-    # Get relevant items (score > 0) from ground truth
+    # Get relevant items (score >= RELEVANCE_THRESHOLD) from ground truth
     # Items not in test set are implicitly scored as 0.0
-    ground_truth_items = [item_id for item_id, score in ground_truth.items() if score > 0]
+    ground_truth_items = [item_id for item_id, score in ground_truth.items() if score >= RELEVANCE_THRESHOLD]
     
     # Calculate metrics for each K
     metrics = {}
     for k in k_values:
         metrics[f'precision@{k}'] = precision_at_k(retrieved_items, ground_truth_items, k)
-        metrics[f'recall@{k}'] = recall_at_k(retrieved_items, ground_truth_items, k)
+        metrics[f'recall@{k}'] = recall_at_k(retrieved_items, ground_truth, k)
         metrics[f'ndcg@{k}'] = ndcg_at_k(retrieved_items, retrieved_scores, ground_truth, k)
-        metrics[f'coverage@{k}'] = coverage_at_k(retrieved_items, ground_truth_items, k)
     
     metrics['mrr'] = mrr(retrieved_items, ground_truth_items)
     
-    # Get top 10 ground truth items sorted by score
+    # Get top 10 ground truth items sorted by score (only highly relevant items with score >= RELEVANCE_THRESHOLD)
     top_gt_items = sorted(
-        [(item_id, score) for item_id, score in ground_truth.items() if score > 0],
+        [(item_id, score) for item_id, score in ground_truth.items() if score >= RELEVANCE_THRESHOLD],
         key=lambda x: x[1],
         reverse=True
     )[:10]
@@ -353,7 +383,6 @@ def generate_evaluation_report(
         precisions = [r['metrics'][f'precision@{k}'] for r in results]
         recalls = [r['metrics'][f'recall@{k}'] for r in results]
         ndcgs = [r['metrics'][f'ndcg@{k}'] for r in results]
-        coverages = [r['metrics'][f'coverage@{k}'] for r in results]
         
         aggregate_metrics[f'precision@{k}'] = {
             'mean': sum(precisions) / num_queries if num_queries > 0 else 0.0,
@@ -366,10 +395,6 @@ def generate_evaluation_report(
         aggregate_metrics[f'ndcg@{k}'] = {
             'mean': sum(ndcgs) / num_queries if num_queries > 0 else 0.0,
             'values': ndcgs,
-        }
-        aggregate_metrics[f'coverage@{k}'] = {
-            'mean': sum(coverages) / num_queries if num_queries > 0 else 0.0,
-            'values': coverages,
         }
     
     mrr_values = [r['metrics']['mrr'] for r in results]
@@ -410,6 +435,8 @@ def generate_evaluation_report(
         f.write("Retrieval Parameters:\n")
         f.write(f"  Top-K: {config.get('retrieval_top_k', 'N/A')}\n")
         f.write(f"  Evaluation K values: {config.get('k_values', 'N/A')}\n")
+        f.write(f"  Relevance Threshold: {RELEVANCE_THRESHOLD} (items with score >= {RELEVANCE_THRESHOLD} are considered relevant)\n")
+        f.write(f"  NDCG Threshold: {NDCG_THRESHOLD} (items with score >= {NDCG_THRESHOLD} are used for IDCG calculation)\n")
         f.write("\n")
         
         # Dataset Configuration
@@ -454,7 +481,6 @@ def generate_evaluation_report(
             f.write(f"  Precision@{k}: {aggregate_metrics[f'precision@{k}']['mean']:.4f}\n")
             f.write(f"  Recall@{k}:    {aggregate_metrics[f'recall@{k}']['mean']:.4f}\n")
             f.write(f"  NDCG@{k}:      {aggregate_metrics[f'ndcg@{k}']['mean']:.4f}\n")
-            f.write(f"  Coverage@{k}:  {aggregate_metrics[f'coverage@{k}']['mean']:.4f}\n")
         
         f.write(f"\nMRR: {aggregate_metrics['mrr']['mean']:.4f}\n")
         f.write("\n")
@@ -478,8 +504,7 @@ def generate_evaluation_report(
             for k in k_values:
                 f.write(f"  Precision@{k}: {metrics[f'precision@{k}']:.4f}, ")
                 f.write(f"Recall@{k}: {metrics[f'recall@{k}']:.4f}, ")
-                f.write(f"NDCG@{k}: {metrics[f'ndcg@{k}']:.4f}, ")
-                f.write(f"Coverage@{k}: {metrics[f'coverage@{k}']:.4f}\n")
+                f.write(f"NDCG@{k}: {metrics[f'ndcg@{k}']:.4f}\n")
             f.write(f"  MRR: {metrics['mrr']:.4f}\n")
             f.write("\n")
             

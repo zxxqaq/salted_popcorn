@@ -7,13 +7,15 @@ Configuration
 
 BM25 Parameters:
   k1: 1.5
-  b:  0.75
-  Cache enabled: True
-  Cache directory: /Users/xianzhang/Documents/prosus/Food-Semantic-Search/data/bm25_cache_5k
+  b: 0.75
+  cache_enabled: True
+  cache_directory: /Users/xianzhang/Documents/prosus/Food-Semantic-Search/data/bm25_cache_5k
 
 Retrieval Parameters:
   Top-K: 10
   Evaluation K values: [5, 10]
+  Relevance Threshold: 5.0 (items with score >= 5.0 are considered relevant)
+  NDCG Threshold: 1.0 (items with score >= 1.0 are used for IDCG calculation)
 
 Dataset Configuration:
   Queries file: /Users/xianzhang/Documents/prosus/Food-Semantic-Search/data/test/30_queries.csv
@@ -39,26 +41,24 @@ Hardware Configuration:
 
 Latency Statistics:
 --------------------------------------------------------------------------------
-Average Latency: 2.69 ms
-Max Latency: 4.21 ms
-Min Latency: 1.73 ms
+Average Latency: 2.75 ms
+Max Latency: 4.44 ms
+Min Latency: 1.79 ms
 
 Aggregate Metrics:
 --------------------------------------------------------------------------------
 
 Metrics @ K=5:
-  Precision@5: 0.9667
-  Recall@5:    0.0589
+  Precision@5: 0.3933
+  Recall@5:    0.2111
   NDCG@5:      0.5920
-  Coverage@5:  0.0572
 
 Metrics @ K=10:
-  Precision@10: 0.9633
-  Recall@10:    0.1177
+  Precision@10: 0.3900
+  Recall@10:    0.2850
   NDCG@10:      0.6225
-  Coverage@10:  0.1160
 
-MRR: 1.0000
+MRR: 0.5490
 
 Per-Query Results:
 ================================================================================
@@ -66,31 +66,31 @@ Per-Query Results:
 Query 88: Desinfetante Uso Geral Lavanda Lysoform
 --------------------------------------------------------------------------------
 Metrics:
-  Precision@5: 1.0000, Recall@5: 0.0877, NDCG@5: 1.1466, Coverage@5: 0.0351
-  Precision@10: 1.0000, Recall@10: 0.1754, NDCG@10: 1.1496, Coverage@10: 0.1228
+  Precision@5: 1.0000, Recall@5: 1.0000, NDCG@5: 1.1466
+  Precision@10: 0.8000, Recall@10: 0.8889, NDCG@10: 1.1496
   MRR: 1.0000
 
 Retrieved Results (Top 10):
    1. [5ad69b46-152b-46fb-8ce3-34c0777c41ca] Desinfetante Uso Geral Lavanda Lysoform 2l
-      BM25 Score: 32.1906, GT Score: 10.0
+      Score: 32.1906, GT Score: 10.0
    2. [fd7d8fe6-1b23-4bf9-b23b-0d978f904492] Desinfetante Uso Geral Lavanda Lysoform 2l
-      BM25 Score: 32.1906, GT Score: 10.0
+      Score: 32.1906, GT Score: 10.0
    3. [fd7d8fe6-1b23-4bf9-b23b-0d978f904492] Desinfetante Uso Geral Lavanda Lysoform 2l
-      BM25 Score: 32.1906, GT Score: 10.0
+      Score: 32.1906, GT Score: 10.0
    4. [fd7d8fe6-1b23-4bf9-b23b-0d978f904492] Desinfetante Uso Geral Lavanda Lysoform 2l
-      BM25 Score: 32.1906, GT Score: 10.0
+      Score: 32.1906, GT Score: 10.0
    5. [fd7d8fe6-1b23-4bf9-b23b-0d978f904492] Desinfetante Uso Geral Lavanda Lysoform 2l
-      BM25 Score: 32.1906, GT Score: 10.0
+      Score: 32.1906, GT Score: 10.0
    6. [5ba790d8-b788-4d55-b7b9-1f429839ae0c] Desinfetante Uso Geral Citrus Lysoform 2l
-      BM25 Score: 26.6065, GT Score: 4.0
+      Score: 26.6065, GT Score: 4.0
    7. [bca554db-d994-46f8-bff8-b28fe77ba18d] Desinfetante Lavanda Lysoform 500ml
-      BM25 Score: 20.0153, GT Score: 9.0
+      Score: 20.0153, GT Score: 9.0
    8. [c1fc87f6-81be-4a17-8374-ca14844dc2d4] Desinfetante Citrus Lysoform 1 L
-      BM25 Score: 14.2380, GT Score: 3.0
+      Score: 14.2380, GT Score: 3.0
    9. [f00c18b2-be75-495e-9d4e-507bdcc55ec5] Desinfetante Lysoform Original 1 Litro
-      BM25 Score: 13.5354, GT Score: 6.0
+      Score: 13.5354, GT Score: 6.0
   10. [e23c3716-87c8-45e2-aa53-8976f7747a7d] Desinfetante Perfumado Lavanda Pinho Sol Com 500ml
-      BM25 Score: 11.3853, GT Score: 6.0
+      Score: 11.3853, GT Score: 6.0
 
 Ground Truth (Top 10):
    1. [5ad69b46-152b-46fb-8ce3-34c0777c41ca] Desinfetante Uso Geral Lavanda Lysoform 2l
@@ -111,90 +111,70 @@ Ground Truth (Top 10):
       GT Score: 5.0
    9. [9e48093a-be3c-4dc1-9852-703ed4d9567e] Limpa Pisos Lavanda Diluível Oferta Destac 500ml
       GT Score: 5.0
-  10. [5ba790d8-b788-4d55-b7b9-1f429839ae0c] Desinfetante Uso Geral Citrus Lysoform 2l
-      GT Score: 4.0
 
 
 Query 6: Pão rústico do campo
 --------------------------------------------------------------------------------
 Metrics:
-  Precision@5: 1.0000, Recall@5: 0.0543, NDCG@5: 0.3587, Coverage@5: 0.0543
-  Precision@10: 0.9000, Recall@10: 0.0978, NDCG@10: 0.3112, Coverage@10: 0.0978
-  MRR: 1.0000
+  Precision@5: 0.0000, Recall@5: 0.0000, NDCG@5: 0.3587
+  Precision@10: 0.0000, Recall@10: 0.0000, NDCG@10: 0.3112
+  MRR: 0.0000
 
 Retrieved Results (Top 10):
    1. [a24d8ae4-99a6-487e-ba2b-f120291d1a47] Buquê Flores do Campo!
-      BM25 Score: 10.6828, GT Score: 3.0
+      Score: 10.6828, GT Score: 3.0
    2. [12ad3517-bcf9-4cd1-a9c4-f81b39711a18] Buquê de Flores do Campo Diversos
-      BM25 Score: 9.8933, GT Score: 1.0
+      Score: 9.8933, GT Score: 1.0
    3. [5cb847be-0556-4307-a7e7-4da3530dda22] Alface Crespa Campo Alegre Hidropônico Maço
-      BM25 Score: 6.8645, GT Score: 1.0
+      Score: 6.8645, GT Score: 1.0
    4. [72633ee5-f07a-40b2-84b3-e7afa5b48e98] Alface Americana Campo Alegre Higiênizado 250g
-      BM25 Score: 6.7478, GT Score: 1.0
+      Score: 6.7478, GT Score: 1.0
    5. [0926334a-fdf0-4378-9cd5-2c98a578435d] Couve Picada Higienizada Campo Alegre 200g
-      BM25 Score: 6.7478, GT Score: 1.0
+      Score: 6.7478, GT Score: 1.0
    6. [e3e037d3-da90-40f7-93eb-fe3c59ba3217] Bola De Futebol De Campo Penalty Bravo Xxiv Vermelha
-      BM25 Score: 6.5258, GT Score: 0.0
+      Score: 6.5258, GT Score: 0.0
    7. [c78e07d6-343b-4aa5-9a74-b214da12178a] Suco Integral Campo Largo 900ml Tangerina/Maca
-      BM25 Score: 6.5258, GT Score: 1.0
+      Score: 6.5258, GT Score: 1.0
    8. [2fb7e851-8c44-4e2d-9c43-54557a7a45be] Iogurte Desnatado Natural Zero Lactose Verde Campo Lacfree 5...
-      BM25 Score: 6.0299, GT Score: 1.0
+      Score: 6.0299, GT Score: 1.0
    9. [30cf26d9-5128-413d-a3db-239a98ce7e76] Stacker Duplo Bacon + Bebida
-      BM25 Score: 5.9361, GT Score: 1.0
+      Score: 5.9361, GT Score: 1.0
   10. [680a2898-939b-40a4-891d-67ab55e1e9ff] Iogurte Desnatado Sabor Pêssego Verde Campo Natural Whey 170...
-      BM25 Score: 5.8520, GT Score: 1.0
+      Score: 5.8520, GT Score: 1.0
 
 Ground Truth (Top 10):
    1. [6c040c45-559e-4aad-b0f7-269c41b56aaa] Baguete Crosta de Grãos
       GT Score: 6.0
-   2. [3d071aff-b100-402f-b016-e4c1f5838e03] Pão do Forno Na Chapa Wickbold 500g
-      GT Score: 4.0
-   3. [ef4fcc03-67f4-49fd-b389-4ef382e98e3c] Pão Integral Grão Castanha do Pará e Quinoa Wickbold 450g
-      GT Score: 4.0
-   4. [366c3e43-6855-4716-90ff-af2d67a5d97a] Pão Francês  380
-      GT Score: 4.0
-   5. [25db4a2e-2df9-4c8a-8c90-d9f28249f7b0] Pão Integral 50 gr
-      GT Score: 4.0
-   6. [0d76a840-f71f-4d1b-af95-2c87d88d3e0d] Pão Integral Aveia e Sementes Clássicas Nutrella 350g
-      GT Score: 4.0
-   7. [028aa4b0-f8c7-4173-9542-b6ea98e55ec5] Pão de Forma 100% Nutrição Sabor Grãos Girassol E Castanha 5...
-      GT Score: 4.0
-   8. [03d98f77-acca-405a-bf7f-ed4ef344a4d0] Pão de Forma 100% Nutrição Sabor Grãos Girassol E Castanha 5...
-      GT Score: 4.0
-   9. [e5cb02f0-d0fc-41a0-ac04-51691805edd5] Pão de Milho Panco 500g
-      GT Score: 4.0
-  10. [a24d8ae4-99a6-487e-ba2b-f120291d1a47] Buquê Flores do Campo!
-      GT Score: 3.0
 
 
 Query 13: Tigela de arroz crocante com proteína
 --------------------------------------------------------------------------------
 Metrics:
-  Precision@5: 1.0000, Recall@5: 0.0543, NDCG@5: 0.7041, Coverage@5: 0.0543
-  Precision@10: 1.0000, Recall@10: 0.1087, NDCG@10: 0.7510, Coverage@10: 0.1087
-  MRR: 1.0000
+  Precision@5: 0.4000, Recall@5: 0.4000, NDCG@5: 0.7041
+  Precision@10: 0.3000, Recall@10: 0.4286, NDCG@10: 0.7510
+  MRR: 0.5000
 
 Retrieved Results (Top 10):
    1. [e30596f4-6ebe-4b02-8878-cd4fcdd4a4ae] 610 - Saint Peter à Vilalva
-      BM25 Score: 11.7422, GT Score: 4.0
+      Score: 11.7422, GT Score: 4.0
    2. [dfdd3034-d7ef-42cb-8afc-53d08883a282] Marmitex Média
-      BM25 Score: 11.4989, GT Score: 5.0
+      Score: 11.4989, GT Score: 5.0
    3. [7d83cceb-41bc-4ba8-89f4-d3d23d11e6c3] 1.000ml Montado / açaí, banana, leite Ninho e granola + 3 ca...
-      BM25 Score: 10.4740, GT Score: 3.0
+      Score: 10.4740, GT Score: 3.0
    4. [1a25e8ff-a870-4f59-8d04-79c025104c11] Filézinho Sassami Crocante
-      BM25 Score: 10.1771, GT Score: 3.0
+      Score: 10.1771, GT Score: 3.0
    5. [7e204b6b-2b71-4118-aaf9-9f008b5d6146] Gostosa  - 500gr
-      BM25 Score: 9.5769, GT Score: 5.0
+      Score: 9.5769, GT Score: 5.0
    6. [8051c985-b6e0-4c60-bbb0-81ef73a0c2d3] Mistura de linguiça com ovo
-      BM25 Score: 9.0883, GT Score: 3.0
+      Score: 9.0883, GT Score: 3.0
    7. [cab78d9d-3bf8-4013-b0d7-60c95c1d8c1a] Bowl Arroz Integral com Faláfel (vegano)
-      BM25 Score: 9.0747, GT Score: 6.0
+      Score: 9.0747, GT Score: 6.0
    8. [e0871f99-8ac6-4963-bf29-0fef71ab6759] Combo família (2 marmitas tradicionais + 1 refrigerantes 2 l...
-      BM25 Score: 8.8383, GT Score: 4.0
+      Score: 8.8383, GT Score: 4.0
    9. [3e6c1426-75cb-4373-997d-b93cc20b23f5] Filé Trufado
-      BM25 Score: 8.7945, GT Score: 3.0
+      Score: 8.7945, GT Score: 3.0
   10. [5b892b5f-4395-4ad5-bf3f-d176d2b15719] Bife a Parmegiana Bovino
-      BM25 Score: 8.7289, GT Score: 3.0
+      Score: 8.7289, GT Score: 3.0
 
 Ground Truth (Top 10):
    1. [cab78d9d-3bf8-4013-b0d7-60c95c1d8c1a] Bowl Arroz Integral com Faláfel (vegano)
@@ -211,42 +191,36 @@ Ground Truth (Top 10):
       GT Score: 5.0
    7. [31fd2198-1bc8-49f8-b68e-b413ee89865b] Especial frango grelhado
       GT Score: 5.0
-   8. [e30596f4-6ebe-4b02-8878-cd4fcdd4a4ae] 610 - Saint Peter à Vilalva
-      GT Score: 4.0
-   9. [e0871f99-8ac6-4963-bf29-0fef71ab6759] Combo família (2 marmitas tradicionais + 1 refrigerantes 2 l...
-      GT Score: 4.0
-  10. [919958fd-97d9-444f-bc56-209786e9ec7a] Filé de Frango Especial  Com Acompanhamentos - Serve Bem Uma...
-      GT Score: 4.0
 
 
 Query 20: Peixe com batatas fritas no estilo pub
 --------------------------------------------------------------------------------
 Metrics:
-  Precision@5: 1.0000, Recall@5: 0.0581, NDCG@5: 0.5539, Coverage@5: 0.0581
-  Precision@10: 1.0000, Recall@10: 0.1163, NDCG@10: 0.5995, Coverage@10: 0.1163
-  MRR: 1.0000
+  Precision@5: 0.0000, Recall@5: 0.0000, NDCG@5: 0.5539
+  Precision@10: 0.0000, Recall@10: 0.0000, NDCG@10: 0.5995
+  MRR: 0.0000
 
 Retrieved Results (Top 10):
    1. [ebbdb1b5-50ff-456d-ad63-72ddd8278edc] Fritas com cheddar e bacon vegano (Pequena)
-      BM25 Score: 13.8654, GT Score: 4.0
+      Score: 13.8654, GT Score: 4.0
    2. [175ab1ce-df83-44e2-9c79-26329503d7b4] Fritas Individual
-      BM25 Score: 13.2758, GT Score: 4.0
+      Score: 13.2758, GT Score: 4.0
    3. [30655efa-37c3-4d7e-9f96-a540258a713e] Fritas+Bacon+Queijo
-      BM25 Score: 13.0820, GT Score: 3.0
+      Score: 13.0820, GT Score: 3.0
    4. [a2e2da96-5d6c-47d5-867a-260beb338acb] Fritas Palito
-      BM25 Score: 12.5342, GT Score: 4.0
+      Score: 12.5342, GT Score: 4.0
    5. [cdbd3bd1-f248-4683-99ad-3d11bf7f37b9] Batata frita com Catupiry e bacon
-      BM25 Score: 12.3924, GT Score: 3.0
+      Score: 12.3924, GT Score: 3.0
    6. [295b260b-5413-4454-8f9a-c939341dceae] 221 - fritas pequenas
-      BM25 Score: 12.2617, GT Score: 4.0
+      Score: 12.2617, GT Score: 4.0
    7. [1437e809-8e8c-4e08-b822-c674d93e57b3] Fritas com Páprica Picante
-      BM25 Score: 12.0736, GT Score: 4.0
+      Score: 12.0736, GT Score: 4.0
    8. [e355feec-9767-4bab-883b-d0446588c466] Fritas
-      BM25 Score: 12.0035, GT Score: 4.0
+      Score: 12.0035, GT Score: 4.0
    9. [a1b85f6c-c935-44d0-94fd-09311fc64c04] Fritas com Catupiry e cheddar
-      BM25 Score: 11.7182, GT Score: 4.0
+      Score: 11.7182, GT Score: 4.0
   10. [90899a53-15f1-4d72-8789-b6b40efb12a0] 190 - porção de fritas
-      BM25 Score: 11.6140, GT Score: 3.0
+      Score: 11.6140, GT Score: 3.0
 
 Ground Truth (Top 10):
    1. [4f3db47d-558f-4307-996d-21e9cd0b168d] Double
@@ -274,31 +248,31 @@ Ground Truth (Top 10):
 Query 26: Tigela de açaí com superalimentos
 --------------------------------------------------------------------------------
 Metrics:
-  Precision@5: 1.0000, Recall@5: 0.0704, NDCG@5: 0.6901, Coverage@5: 0.0704
-  Precision@10: 1.0000, Recall@10: 0.1408, NDCG@10: 0.7120, Coverage@10: 0.1408
+  Precision@5: 0.8000, Recall@5: 0.2000, NDCG@5: 0.6901
+  Precision@10: 0.9000, Recall@10: 0.2000, NDCG@10: 0.7120
   MRR: 1.0000
 
 Retrieved Results (Top 10):
    1. [7d83cceb-41bc-4ba8-89f4-d3d23d11e6c3] 1.000ml Montado / açaí, banana, leite Ninho e granola + 3 ca...
-      BM25 Score: 15.8756, GT Score: 9.0
+      Score: 15.8756, GT Score: 9.0
    2. [cf9b13fe-afac-4af2-8d52-fe499fae42fa] Açaí Pote 1litro recheado com avelã
-      BM25 Score: 10.7055, GT Score: 5.0
+      Score: 10.7055, GT Score: 5.0
    3. [39566b73-0ff8-4e97-b43a-da341eb92d3a] Suco de Açaí c/ Suco Laranja (garrafinha 300ml)
-      BM25 Score: 10.5106, GT Score: 5.0
+      Score: 10.5106, GT Score: 5.0
    4. [f234fa3f-13c0-414a-be56-4d61d2ca566e] Marmita de açaí p
-      BM25 Score: 10.4444, GT Score: 4.0
+      Score: 10.4444, GT Score: 4.0
    5. [dbcc98d5-a88c-40fe-8703-898f955e70ae] Açaí Trufado 400 Ml
-      BM25 Score: 10.1513, GT Score: 5.0
+      Score: 10.1513, GT Score: 5.0
    6. [2cfe9fa3-0d7e-46eb-96ef-a4dfbf74384f] Açaí 500ml+3 adicionais 1,00+2 frutas+1 creme opcional
-      BM25 Score: 9.8476, GT Score: 8.0
+      Score: 9.8476, GT Score: 8.0
    7. [b492caac-89eb-4a7d-b84a-cc292f1cef7f] Pote de Açaí 1lt com acompanhamentos
-      BM25 Score: 9.7453, GT Score: 6.0
+      Score: 9.7453, GT Score: 6.0
    8. [1a3ad26a-e111-48fd-a682-931295b61c48] Açaí no Copo
-      BM25 Score: 9.5856, GT Score: 5.0
+      Score: 9.5856, GT Score: 5.0
    9. [6df66244-3312-42ff-bcb6-6414b78b3caf] Açaí 500ml
-      BM25 Score: 9.5773, GT Score: 5.0
+      Score: 9.5773, GT Score: 5.0
   10. [781708fb-ef6b-4578-ad77-2e5e8ef8f0eb] Açaí 500ml
-      BM25 Score: 9.5740, GT Score: 6.0
+      Score: 9.5740, GT Score: 6.0
 
 Ground Truth (Top 10):
    1. [7d83cceb-41bc-4ba8-89f4-d3d23d11e6c3] 1.000ml Montado / açaí, banana, leite Ninho e granola + 3 ca...
@@ -326,83 +300,63 @@ Ground Truth (Top 10):
 Query 7: Asas de frango coreanas apimentadas
 --------------------------------------------------------------------------------
 Metrics:
-  Precision@5: 1.0000, Recall@5: 0.0595, NDCG@5: 0.5269, Coverage@5: 0.0595
-  Precision@10: 1.0000, Recall@10: 0.1190, NDCG@10: 0.6131, Coverage@10: 0.1190
-  MRR: 1.0000
+  Precision@5: 0.0000, Recall@5: 0.0000, NDCG@5: 0.5269
+  Precision@10: 0.0000, Recall@10: 0.0000, NDCG@10: 0.6131
+  MRR: 0.0000
 
 Retrieved Results (Top 10):
    1. [0ecebfee-c326-4fd9-971d-9d130914f41f] Filé de frango N 61
-      BM25 Score: 5.3229, GT Score: 1.0
+      Score: 5.3229, GT Score: 1.0
    2. [2e64c7d3-bfeb-4816-a547-71ad5dd2ca1e] Supreme
-      BM25 Score: 5.0807, GT Score: 2.0
+      Score: 5.0807, GT Score: 2.0
    3. [ba9d900f-df9a-4b3f-9855-58e58ec0d05b] 30 - frango da casa
-      BM25 Score: 5.0669, GT Score: 3.0
+      Score: 5.0669, GT Score: 3.0
    4. [fdaf009b-e1ce-4cfc-a2cc-f08a786fa53e] Frango+bacon+ovo+Catupiry
-      BM25 Score: 5.0408, GT Score: 2.0
+      Score: 5.0408, GT Score: 2.0
    5. [a44f6c5e-1eff-4f8b-a237-263cbc336108] Frango Xadrez Ex Grande Cbn
-      BM25 Score: 5.0005, GT Score: 3.0
+      Score: 5.0005, GT Score: 3.0
    6. [c66f3e87-bc90-42e2-a640-2fe5f41ba912] Frango com polenta
-      BM25 Score: 4.9959, GT Score: 3.0
+      Score: 4.9959, GT Score: 3.0
    7. [de15af8a-8b6e-4fa3-93c1-d73cd638219f] Coxinha de Frango
-      BM25 Score: 4.9614, GT Score: 3.0
+      Score: 4.9614, GT Score: 3.0
    8. [77baf5bf-c04c-4e5c-a41f-0c94036c8e6c] 26 - frango, queijo, milho, Catupiry, presunto, salada
-      BM25 Score: 4.8947, GT Score: 2.0
+      Score: 4.8947, GT Score: 2.0
    9. [e5f8a501-46ab-4c30-9665-150b6a50115d] Pastel de Frango & Catupiry
-      BM25 Score: 4.8947, GT Score: 2.0
+      Score: 4.8947, GT Score: 2.0
   10. [5dc50ca5-7418-41ff-a673-f10c628fa104] Empada de frango
-      BM25 Score: 4.8947, GT Score: 2.0
+      Score: 4.8947, GT Score: 2.0
 
 Ground Truth (Top 10):
-   1. [6dd2df3b-765b-41b8-b868-ddce6cb9df15] Coxa com Sobrecoxa de Frango Big Frango Bandeja Kg
-      GT Score: 4.0
-   2. [a8413974-2cd9-4345-ae45-1e960746003b] Empanado de Frango Coxinha da Asa Sadia 400g
-      GT Score: 4.0
-   3. [d7ff311e-b594-498c-9eba-eff05e31d516] Frango Desfiado Temperado Cozido Sadia 400g
-      GT Score: 4.0
-   4. [ba9d900f-df9a-4b3f-9855-58e58ec0d05b] 30 - frango da casa
-      GT Score: 3.0
-   5. [a44f6c5e-1eff-4f8b-a237-263cbc336108] Frango Xadrez Ex Grande Cbn
-      GT Score: 3.0
-   6. [c66f3e87-bc90-42e2-a640-2fe5f41ba912] Frango com polenta
-      GT Score: 3.0
-   7. [de15af8a-8b6e-4fa3-93c1-d73cd638219f] Coxinha de Frango
-      GT Score: 3.0
-   8. [6800a77e-f98a-46bb-8df6-ca8b9656a87d] Marmitex De Coração E Medalhão De Frango
-      GT Score: 3.0
-   9. [07efd818-26a6-4ebd-8b69-ec68713ee980] Pastel de frango c/ requeijão
-      GT Score: 3.0
-  10. [586085ba-7128-4534-ba29-9f037cad9173] Pastel Mexicano de frango
-      GT Score: 3.0
 
 
 Query 51: Prato de frutos do mar costeiros
 --------------------------------------------------------------------------------
 Metrics:
-  Precision@5: 1.0000, Recall@5: 0.0667, NDCG@5: 0.8414, Coverage@5: 0.0667
-  Precision@10: 1.0000, Recall@10: 0.1333, NDCG@10: 0.8173, Coverage@10: 0.1333
+  Precision@5: 0.8000, Recall@5: 0.6000, NDCG@5: 0.8414
+  Precision@10: 0.7000, Recall@10: 0.3000, NDCG@10: 0.8173
   MRR: 1.0000
 
 Retrieved Results (Top 10):
    1. [bf68bcc4-086f-4ef4-81e1-f250213b0e05] Camarão Grande Grelhado
-      BM25 Score: 18.7774, GT Score: 7.0
+      Score: 18.7774, GT Score: 7.0
    2. [9c43eb07-11be-4bdd-8351-d4da3972d7a9] Ex Linguado ao Molho / Maracujá
-      BM25 Score: 16.7639, GT Score: 6.0
+      Score: 16.7639, GT Score: 6.0
    3. [3eaf2c2b-b219-43a9-bbb4-fe061bebedf9] Lula á dorê
-      BM25 Score: 15.6661, GT Score: 6.0
+      Score: 15.6661, GT Score: 6.0
    4. [afa7fb3b-f9b1-4a01-bf05-3d99b1637eba] Molho Tartáro
-      BM25 Score: 15.3903, GT Score: 5.0
+      Score: 15.3903, GT Score: 5.0
    5. [b4bd0ed6-ca2e-4ff8-aa4b-383820e559ea] Tilápia Frita
-      BM25 Score: 15.3903, GT Score: 3.0
+      Score: 15.3903, GT Score: 3.0
    6. [42247b03-5189-48cd-a400-8989032120a9] Teishoku salmão
-      BM25 Score: 13.8063, GT Score: 4.0
+      Score: 13.8063, GT Score: 4.0
    7. [3735d27d-6174-4520-aae2-479b3680ae56] Cação ao molho
-      BM25 Score: 13.7015, GT Score: 5.0
+      Score: 13.7015, GT Score: 5.0
    8. [edbc3497-668a-4f27-81ab-d69499435ef3] Atum Pedaços em Óleo Gomes da Costa 500g
-      BM25 Score: 13.4901, GT Score: 5.0
+      Score: 13.4901, GT Score: 5.0
    9. [bbf09400-bdc2-4ab8-9531-0bb687d3bdbe] Atum Sólido Em Óleo Gomes da Costa 120g
-      BM25 Score: 13.4901, GT Score: 5.0
+      Score: 13.4901, GT Score: 5.0
   10. [120c59a9-2c31-4767-a314-1b7d788a8013] 2115 - salmão ao molho laranja
-      BM25 Score: 13.3929, GT Score: 4.0
+      Score: 13.3929, GT Score: 4.0
 
 Ground Truth (Top 10):
    1. [4e29cf4d-37cc-49f1-811c-b7513cc972c4] Combo Moqueca de Camarão + Coca-Cola Lata
@@ -430,31 +384,31 @@ Ground Truth (Top 10):
 Query 52: Salada fresca do mercado do fazendeiro
 --------------------------------------------------------------------------------
 Metrics:
-  Precision@5: 1.0000, Recall@5: 0.0532, NDCG@5: 0.4368, Coverage@5: 0.0532
-  Precision@10: 1.0000, Recall@10: 0.1064, NDCG@10: 0.4815, Coverage@10: 0.1064
-  MRR: 1.0000
+  Precision@5: 0.2000, Recall@5: 0.0000, NDCG@5: 0.4368
+  Precision@10: 0.2000, Recall@10: 0.1000, NDCG@10: 0.4815
+  MRR: 0.3333
 
 Retrieved Results (Top 10):
    1. [b7d8fa12-2737-434d-84a4-800fbd531d36] Salada Crispy Caesar + Suco do Dia
-      BM25 Score: 12.5805, GT Score: 4.0
+      Score: 12.5805, GT Score: 4.0
    2. [59073373-6c6b-453c-9d1a-b9d3abf7a692] X Salada Bacon N15
-      BM25 Score: 11.8524, GT Score: 2.0
+      Score: 11.8524, GT Score: 2.0
    3. [125adcaf-7f53-4a9a-9a84-c04ebbb84721] Marmita 500gr | Strogonoff de Frango
-      BM25 Score: 10.8146, GT Score: 5.0
+      Score: 10.8146, GT Score: 5.0
    4. [42247b03-5189-48cd-a400-8989032120a9] Teishoku salmão
-      BM25 Score: 9.6799, GT Score: 3.0
+      Score: 9.6799, GT Score: 3.0
    5. [470f71a4-546d-4803-8496-2f6bde1e6c60] Hambúrguer  à  pizzaiolo
-      BM25 Score: 9.5328, GT Score: 3.0
+      Score: 9.5328, GT Score: 3.0
    6. [4414a6a8-01b6-4417-abfc-b31255ea411c] Tilápia a Moda
-      BM25 Score: 9.2516, GT Score: 3.0
+      Score: 9.2516, GT Score: 3.0
    7. [0fc3508d-f2c9-4dfc-8289-603d48236c78] Salada Caesar
-      BM25 Score: 9.1171, GT Score: 3.0
+      Score: 9.1171, GT Score: 3.0
    8. [6e60bc0a-94ec-4422-8b1a-2c6783d84234] Suco do Dia - Melancia 500ml
-      BM25 Score: 8.8229, GT Score: 3.0
+      Score: 8.8229, GT Score: 3.0
    9. [5f65f43e-d49a-40bc-97a1-0b22a9986868] 500ml de Açaí + 5 adicionais
-      BM25 Score: 8.7588, GT Score: 3.0
+      Score: 8.7588, GT Score: 3.0
   10. [01d0e13c-dd1e-4840-bfc1-072449174313] Marmitex premium
-      BM25 Score: 8.6773, GT Score: 6.0
+      Score: 8.6773, GT Score: 6.0
 
 Ground Truth (Top 10):
    1. [6bc65da7-d561-4525-8b9d-80b3eabb4fd7] Salada (M) Alface, Tomate e Cebola
@@ -482,31 +436,31 @@ Ground Truth (Top 10):
 Query 69: Batata-doce assada recheada
 --------------------------------------------------------------------------------
 Metrics:
-  Precision@5: 1.0000, Recall@5: 0.0575, NDCG@5: 0.9046, Coverage@5: 0.0575
-  Precision@10: 1.0000, Recall@10: 0.1149, NDCG@10: 0.9204, Coverage@10: 0.1149
+  Precision@5: 0.6000, Recall@5: 0.6000, NDCG@5: 0.9046
+  Precision@10: 0.5000, Recall@10: 0.8333, NDCG@10: 0.9204
   MRR: 1.0000
 
 Retrieved Results (Top 10):
    1. [a9955e4b-2c88-446c-a251-b9867dcbff02] Recheada Carne seca c/ Catupiry
-      BM25 Score: 18.2940, GT Score: 6.0
+      Score: 18.2940, GT Score: 6.0
    2. [fc035643-1dc1-4697-9729-b01853196162] Bacon especial
-      BM25 Score: 16.0417, GT Score: 5.0
+      Score: 16.0417, GT Score: 5.0
    3. [da28eeba-97ee-49e0-95d9-9ee5b41df1d5] Batata Recheada de Strogonoff de carne e catupiry
-      BM25 Score: 12.7118, GT Score: 4.0
+      Score: 12.7118, GT Score: 4.0
    4. [8ac4728a-98de-4d7f-a3e1-b9d6f57c66d9] Batata Doce Branca
-      BM25 Score: 11.5426, GT Score: 4.0
+      Score: 11.5426, GT Score: 4.0
    5. [882072dc-093c-44ac-970a-0f99b20fb481] Batata Doce Roxa Bandeja 900g
-      BM25 Score: 11.1412, GT Score: 5.0
+      Score: 11.1412, GT Score: 5.0
    6. [0d4f5da4-7374-4165-929c-0dd0c84f867d] Batata Recheada Marguerita
-      BM25 Score: 10.9546, GT Score: 5.0
+      Score: 10.9546, GT Score: 5.0
    7. [9d2cf73a-8f3b-4604-bb66-e281a1f50e09] Batata Recheada Texas
-      BM25 Score: 10.5517, GT Score: 4.0
+      Score: 10.5517, GT Score: 4.0
    8. [0b17624a-339d-4231-a9ca-e2544137f98d] Bacon com Catupiry
-      BM25 Score: 10.1242, GT Score: 4.0
+      Score: 10.1242, GT Score: 4.0
    9. [deeafbf7-fa94-4672-847d-5e760196337d] Batata recheada com Bacon e Cheddar+ Coca 350ml Grátis - Gra...
-      BM25 Score: 9.8814, GT Score: 5.0
+      Score: 9.8814, GT Score: 5.0
   10. [acae92a9-0a11-444c-a8db-885d3870eb29] Cupim Recheado
-      BM25 Score: 9.6881, GT Score: 2.0
+      Score: 9.6881, GT Score: 2.0
 
 Ground Truth (Top 10):
    1. [a9955e4b-2c88-446c-a251-b9867dcbff02] Recheada Carne seca c/ Catupiry
@@ -521,44 +475,36 @@ Ground Truth (Top 10):
       GT Score: 5.0
    6. [deeafbf7-fa94-4672-847d-5e760196337d] Batata recheada com Bacon e Cheddar+ Coca 350ml Grátis - Gra...
       GT Score: 5.0
-   7. [da28eeba-97ee-49e0-95d9-9ee5b41df1d5] Batata Recheada de Strogonoff de carne e catupiry
-      GT Score: 4.0
-   8. [8ac4728a-98de-4d7f-a3e1-b9d6f57c66d9] Batata Doce Branca
-      GT Score: 4.0
-   9. [9d2cf73a-8f3b-4604-bb66-e281a1f50e09] Batata Recheada Texas
-      GT Score: 4.0
-  10. [0b17624a-339d-4231-a9ca-e2544137f98d] Bacon com Catupiry
-      GT Score: 4.0
 
 
 Query 94: Tigela de sopa quentinha para o inverno
 --------------------------------------------------------------------------------
 Metrics:
-  Precision@5: 1.0000, Recall@5: 0.0532, NDCG@5: 0.6538, Coverage@5: 0.0532
-  Precision@10: 1.0000, Recall@10: 0.1064, NDCG@10: 0.6136, Coverage@10: 0.1064
+  Precision@5: 0.6000, Recall@5: 0.2000, NDCG@5: 0.6538
+  Precision@10: 0.5000, Recall@10: 0.4000, NDCG@10: 0.6136
   MRR: 1.0000
 
 Retrieved Results (Top 10):
    1. [275e1978-a56d-4f45-9158-30e8700a77c9] 8220- creme de alho poró com gorgonzola
-      BM25 Score: 9.8418, GT Score: 8.0
+      Score: 9.8418, GT Score: 8.0
    2. [7d83cceb-41bc-4ba8-89f4-d3d23d11e6c3] 1.000ml Montado / açaí, banana, leite Ninho e granola + 3 ca...
-      BM25 Score: 8.1872, GT Score: 2.0
+      Score: 8.1872, GT Score: 2.0
    3. [ec68d63a-1989-4268-8cd2-09615409ccfd] Sopa Caldinho de Feijão Vono 18g
-      BM25 Score: 7.5400, GT Score: 7.0
+      Score: 7.5400, GT Score: 7.0
    4. [7a7e9474-9be3-42d5-8e97-3868bc60b01d] Chá Misto Inverno - 10 Sachês
-      BM25 Score: 7.4832, GT Score: 5.0
+      Score: 7.4832, GT Score: 5.0
    5. [a63ec54d-2ba9-48c9-9314-d583b5a7d347] Combo Porção Mix Peixe Empanado e Frito
-      BM25 Score: 7.1611, GT Score: 3.0
+      Score: 7.1611, GT Score: 3.0
    6. [70ee6e32-38ef-4188-9dc0-fb2b53bfa702] Marmita M Strogonoff
-      BM25 Score: 7.1488, GT Score: 3.0
+      Score: 7.1488, GT Score: 3.0
    7. [eefacff1-dfa9-44f3-8e4f-d16d5954b348] Sopa Individual Cremosa Sabor Peito de Frango com Queijo Von...
-      BM25 Score: 6.9999, GT Score: 8.0
+      Score: 6.9999, GT Score: 8.0
    8. [7d74a3e7-85f8-4ac6-9905-e59e920bc8af] Kibon Mini Eskibon Morango 92g
-      BM25 Score: 6.9167, GT Score: 1.0
+      Score: 6.9167, GT Score: 1.0
    9. [ea8ef304-77ea-47aa-8c0e-8e3e65be2cc7] Trio Cheddar Australiano + Milk Shake 300 ml
-      BM25 Score: 6.9102, GT Score: 1.0
+      Score: 6.9102, GT Score: 1.0
   10. [7a4d4166-8801-4268-8e90-4896c646f366] Sopa Individual Cremosa Sabor Mandioquinha Cebola e Salsa Vo...
-      BM25 Score: 6.8038, GT Score: 8.0
+      Score: 6.8038, GT Score: 8.0
 
 Ground Truth (Top 10):
    1. [ef8015e8-beb4-4c07-950d-98391052a185] Caldo de Kenga
@@ -586,31 +532,31 @@ Ground Truth (Top 10):
 Query 99: Carne assada caseira com acompanhamentos
 --------------------------------------------------------------------------------
 Metrics:
-  Precision@5: 1.0000, Recall@5: 0.0543, NDCG@5: 0.5080, Coverage@5: 0.0543
-  Precision@10: 1.0000, Recall@10: 0.1087, NDCG@10: 0.5992, Coverage@10: 0.1087
-  MRR: 1.0000
+  Precision@5: 0.2000, Recall@5: 0.0000, NDCG@5: 0.5080
+  Precision@10: 0.4000, Recall@10: 0.3000, NDCG@10: 0.5992
+  MRR: 0.3333
 
 Retrieved Results (Top 10):
    1. [78e857a2-1d2a-4807-828a-878035d6b77e] Pastel de Carne com Queijo
-      BM25 Score: 13.3586, GT Score: 4.0
+      Score: 13.3586, GT Score: 4.0
    2. [79676995-4880-4807-a85a-a6471f391530] 710g carne moida , frango a milanesa, farofa caseira e frita...
-      BM25 Score: 13.0819, GT Score: 4.0
+      Score: 13.0819, GT Score: 4.0
    3. [29ad9fe1-a5f2-4947-8368-ab639d6b6fdf] Carne com mandioca
-      BM25 Score: 12.7102, GT Score: 5.0
+      Score: 12.7102, GT Score: 5.0
    4. [a9955e4b-2c88-446c-a251-b9867dcbff02] Recheada Carne seca c/ Catupiry
-      BM25 Score: 12.6875, GT Score: 4.0
+      Score: 12.6875, GT Score: 4.0
    5. [c16885b4-fcb3-4498-8e6c-317acc0bd3f4] Parmegiana de Carne
-      BM25 Score: 11.4941, GT Score: 4.0
+      Score: 11.4941, GT Score: 4.0
    6. [df9b6505-4639-4f25-8cb6-1e72f0da7e31] Iscas de carne acebolada
-      BM25 Score: 11.4199, GT Score: 6.0
+      Score: 11.4199, GT Score: 6.0
    7. [ee77f1c9-d67a-4d87-85d4-bf2e82bdf363] Costela assada bovina kg
-      BM25 Score: 10.6015, GT Score: 7.0
+      Score: 10.6015, GT Score: 7.0
    8. [5d9ac07f-66ed-4a9f-8f4a-f3a56bdeec0b] Gyoza Dobro
-      BM25 Score: 10.3122, GT Score: 3.0
+      Score: 10.3122, GT Score: 3.0
    9. [c5908933-f855-4f8f-ac21-76eebb2f6c0a] Bifes
-      BM25 Score: 10.2056, GT Score: 4.0
+      Score: 10.2056, GT Score: 4.0
   10. [9cdb0d84-4ff1-429b-b70c-74b7a99b324a] Gran chorizo
-      BM25 Score: 9.9381, GT Score: 6.0
+      Score: 9.9381, GT Score: 6.0
 
 Ground Truth (Top 10):
    1. [682db92b-b8ce-408b-a0d7-503c91132f1b] Picanha Fatiada + 2 Acompanhamentos
@@ -638,31 +584,31 @@ Ground Truth (Top 10):
 Query 60: Massa italiana rústica
 --------------------------------------------------------------------------------
 Metrics:
-  Precision@5: 1.0000, Recall@5: 0.0575, NDCG@5: 0.3173, Coverage@5: 0.0575
-  Precision@10: 1.0000, Recall@10: 0.1149, NDCG@10: 0.3866, Coverage@10: 0.1149
-  MRR: 1.0000
+  Precision@5: 0.0000, Recall@5: 0.0000, NDCG@5: 0.3173
+  Precision@10: 0.2000, Recall@10: 0.0000, NDCG@10: 0.3866
+  MRR: 0.1111
 
 Retrieved Results (Top 10):
    1. [9866e6c6-f46f-4cd3-b1c5-4a0a954bb1b5] Batata Rústica com Molho Tártaro
-      BM25 Score: 9.4842, GT Score: 3.0
+      Score: 9.4842, GT Score: 3.0
    2. [c7e11bb9-f1d4-4003-92d7-46aa2154eb8f] Batata Rústica com Molho Tártaro
-      BM25 Score: 9.4842, GT Score: 3.0
+      Score: 9.4842, GT Score: 3.0
    3. [2380a720-523f-460e-9811-d68dd8539d1a] Soda Italiana (500ml)
-      BM25 Score: 8.4844, GT Score: 1.0
+      Score: 8.4844, GT Score: 1.0
    4. [2ef33249-5826-4663-bb00-30b0fd95fd42] Combo Lays Rústica Cream Cheese Lays
-      BM25 Score: 8.1832, GT Score: 2.0
+      Score: 8.1832, GT Score: 2.0
    5. [99595b7b-e227-441d-9568-4dd3ea8a6e2c] Abobrinha Italiana Fatiada para Lasanha Oba Kg
-      BM25 Score: 7.5915, GT Score: 4.0
+      Score: 7.5915, GT Score: 4.0
    6. [926cb234-3d27-43e9-92cd-8e8d05891146] Batata Rústica Sabor Cream Cheese Lays 68g
-      BM25 Score: 7.5101, GT Score: 1.0
+      Score: 7.5101, GT Score: 1.0
    7. [76dbb159-9169-494d-8e45-f0a2cfe2f571] Abobrinha Italiana Irmãos Pimenta 550g
-      BM25 Score: 7.3288, GT Score: 3.0
+      Score: 7.3288, GT Score: 3.0
    8. [f4d47f37-f2a4-46ed-8b2f-ab90104aa7f3] Pizza  Italiana
-      BM25 Score: 7.3288, GT Score: 4.0
+      Score: 7.3288, GT Score: 4.0
    9. [4ffb5c6f-0be4-4ca0-ba2a-fa77a2fb61e7] Massa Alfredo com Camarões
-      BM25 Score: 6.9531, GT Score: 6.0
+      Score: 6.9531, GT Score: 6.0
   10. [7dc709fd-d92b-4d20-86ca-0727aa9a1749] Spaghetti  ao molho italiana
-      BM25 Score: 6.2478, GT Score: 6.0
+      Score: 6.2478, GT Score: 6.0
 
 Ground Truth (Top 10):
    1. [d1ea3ba6-7663-4988-97f9-19e040d5a166] Crie sua Massa Favorita
@@ -690,31 +636,31 @@ Ground Truth (Top 10):
 Query 54: Ensopado reconfortante cozido lentamente
 --------------------------------------------------------------------------------
 Metrics:
-  Precision@5: 1.0000, Recall@5: 0.0694, NDCG@5: 0.5473, Coverage@5: 0.0694
-  Precision@10: 1.0000, Recall@10: 0.1389, NDCG@10: 0.6161, Coverage@10: 0.1389
+  Precision@5: 0.2000, Recall@5: 0.0000, NDCG@5: 0.5473
+  Precision@10: 0.3000, Recall@10: 0.3333, NDCG@10: 0.6161
   MRR: 1.0000
 
 Retrieved Results (Top 10):
    1. [c842f813-78eb-4363-9d8f-d89a1e7f9716] Feijão
-      BM25 Score: 11.6111, GT Score: 5.0
+      Score: 11.6111, GT Score: 5.0
    2. [b27dbd89-67e0-44ea-a44f-998cff564e4b] Frango a passarinho
-      BM25 Score: 7.7987, GT Score: 4.0
+      Score: 7.7987, GT Score: 4.0
    3. [4d1c1d01-1bb9-4ce8-a857-b5f84777057d] Peito de Peru Cozido Pedaço Sadia Kg
-      BM25 Score: 6.4785, GT Score: 4.0
+      Score: 6.4785, GT Score: 4.0
    4. [b7fcf494-0824-4267-9f66-369a5ec8011b] Presunto Cozido Fatiado Perdigão Kg
-      BM25 Score: 6.3702, GT Score: 3.0
+      Score: 6.3702, GT Score: 3.0
    5. [f13443ca-f947-4a6a-84ef-04ce2c90099c] Presunto Cozido sem Capa Aurora 180g
-      BM25 Score: 6.2654, GT Score: 3.0
+      Score: 6.2654, GT Score: 3.0
    6. [175a6801-52c3-4f92-8b7b-b027e0c9040b] Frango Cozido E Desfiado Aurora 360g
-      BM25 Score: 6.1640, GT Score: 5.0
+      Score: 6.1640, GT Score: 5.0
    7. [9ef4d65d-6c66-4e85-9ec2-450ba176a9db] Presunto Cozido Fatiado Soltíssimo Sadia 200g
-      BM25 Score: 6.1640, GT Score: 3.0
+      Score: 6.1640, GT Score: 3.0
    8. [3d2c6dbd-11c0-489f-9780-3775cd0383de] Presunto Cozido sem Capa de Gordura Seara Fatiado Kg
-      BM25 Score: 5.9708, GT Score: 3.0
+      Score: 5.9708, GT Score: 3.0
    9. [32f386c4-ba89-4ebd-b322-aeff3b988faa] Grão de Bico Vapza Cozido a Vapor Caixa 500g
-      BM25 Score: 5.8786, GT Score: 4.0
+      Score: 5.8786, GT Score: 4.0
   10. [d7ff311e-b594-498c-9eba-eff05e31d516] Frango Desfiado Temperado Cozido Sadia 400g
-      BM25 Score: 5.8786, GT Score: 6.0
+      Score: 5.8786, GT Score: 6.0
 
 Ground Truth (Top 10):
    1. [a7715e50-694b-45cd-bdc8-1e0143af8258] Feijoada Para 2 Pessoas
@@ -735,38 +681,36 @@ Ground Truth (Top 10):
       GT Score: 5.0
    9. [175a6801-52c3-4f92-8b7b-b027e0c9040b] Frango Cozido E Desfiado Aurora 360g
       GT Score: 5.0
-  10. [b27dbd89-67e0-44ea-a44f-998cff564e4b] Frango a passarinho
-      GT Score: 4.0
 
 
 Query 42: Elementos de pizza napolitana
 --------------------------------------------------------------------------------
 Metrics:
-  Precision@5: 1.0000, Recall@5: 0.0667, NDCG@5: 0.6454, Coverage@5: 0.0667
-  Precision@10: 1.0000, Recall@10: 0.1333, NDCG@10: 0.7251, Coverage@10: 0.1333
+  Precision@5: 0.4000, Recall@5: 0.4000, NDCG@5: 0.6454
+  Precision@10: 0.4000, Recall@10: 0.4000, NDCG@10: 0.7251
   MRR: 1.0000
 
 Retrieved Results (Top 10):
    1. [21138bda-7c2e-4f72-b91f-bb10261f718c] Pizza Grande + Refrigerante 2l
-      BM25 Score: 9.4183, GT Score: 8.0
+      Score: 9.4183, GT Score: 8.0
    2. [0a713564-b16c-4fae-8c95-5f674cbf21f7] Adicionar mais Requeijão
-      BM25 Score: 7.5846, GT Score: 3.0
+      Score: 7.5846, GT Score: 3.0
    3. [6a803fb6-3616-4c1a-bb11-a1c723fcd2d1] Compre 1 Pizza G Calabresa + 1 Pizza G Marguerita e leve Grá...
-      BM25 Score: 7.2836, GT Score: 6.0
+      Score: 7.2836, GT Score: 6.0
    4. [9df81e65-ba8f-45b6-a2a1-034a2984335d] Pastel de pizza
-      BM25 Score: 7.2667, GT Score: 4.0
+      Score: 7.2667, GT Score: 4.0
    5. [f4d47f37-f2a4-46ed-8b2f-ab90104aa7f3] Pizza  Italiana
-      BM25 Score: 7.0418, GT Score: 3.0
+      Score: 7.0418, GT Score: 3.0
    6. [67c71b1c-02be-4747-bf5e-4690cb7dd45a] Pizza de Marguerita (8 pedaços) + Refri 2 litros
-      BM25 Score: 6.7609, GT Score: 9.0
+      Score: 6.7609, GT Score: 9.0
    7. [4b6e4175-45d0-4a7a-a84f-ce7b47cb8f39] Pizza : Bacon Especial / Chocolate + Refri 2l
-      BM25 Score: 6.6841, GT Score: 1.0
+      Score: 6.6841, GT Score: 1.0
    8. [560eba32-44a3-478d-a9e4-fc572dd662a3] 1 Pizza Costela Catupiry+1 Frango Catu + Refri 2l( Cortesia ...
-      BM25 Score: 6.6349, GT Score: 3.0
+      Score: 6.6349, GT Score: 3.0
    9. [b2000705-5f04-4de9-8525-c8c98227d021] Pizza : 4 queijos / Frango com Catupiry + Refri 2l
-      BM25 Score: 6.5386, GT Score: 3.0
+      Score: 6.5386, GT Score: 3.0
   10. [e9eb2a2c-0967-4487-a627-41ae340a8a4f] Segunda: Margherita
-      BM25 Score: 6.5273, GT Score: 9.0
+      Score: 6.5273, GT Score: 9.0
 
 Ground Truth (Top 10):
    1. [67c71b1c-02be-4747-bf5e-4690cb7dd45a] Pizza de Marguerita (8 pedaços) + Refri 2 litros
@@ -794,31 +738,31 @@ Ground Truth (Top 10):
 Query 30: Tigela de proteína vegetariana
 --------------------------------------------------------------------------------
 Metrics:
-  Precision@5: 1.0000, Recall@5: 0.0735, NDCG@5: 0.2760, Coverage@5: 0.0735
-  Precision@10: 1.0000, Recall@10: 0.1471, NDCG@10: 0.3593, Coverage@10: 0.1471
-  MRR: 1.0000
+  Precision@5: 0.2000, Recall@5: 0.0000, NDCG@5: 0.2760
+  Precision@10: 0.3000, Recall@10: 0.3333, NDCG@10: 0.3593
+  MRR: 0.2500
 
 Retrieved Results (Top 10):
    1. [7d83cceb-41bc-4ba8-89f4-d3d23d11e6c3] 1.000ml Montado / açaí, banana, leite Ninho e granola + 3 ca...
-      BM25 Score: 8.1872, GT Score: 2.0
+      Score: 8.1872, GT Score: 2.0
    2. [e30596f4-6ebe-4b02-8878-cd4fcdd4a4ae] 610 - Saint Peter à Vilalva
-      BM25 Score: 6.8713, GT Score: 1.0
+      Score: 6.8713, GT Score: 1.0
    3. [8051c985-b6e0-4c60-bbb0-81ef73a0c2d3] Mistura de linguiça com ovo
-      BM25 Score: 6.2406, GT Score: 1.0
+      Score: 6.2406, GT Score: 1.0
    4. [74aee10b-bdd8-4ca5-aaf2-384e2a1d9190] Barra de Proteína Sabor Cookies & Cream Bold Crunch 50g
-      BM25 Score: 6.2406, GT Score: 5.0
+      Score: 6.2406, GT Score: 5.0
    5. [dfdd3034-d7ef-42cb-8afc-53d08883a282] Marmitex Média
-      BM25 Score: 6.1067, GT Score: 2.0
+      Score: 6.1067, GT Score: 2.0
    6. [9ba1f990-d25c-4ce2-92ba-31582f8e663f] Barra de Proteína Protein Crisp Sabor Trufa de Avelã Integra...
-      BM25 Score: 6.0795, GT Score: 1.0
+      Score: 6.0795, GT Score: 1.0
    7. [0924b7b7-a9c0-4dbc-ad4d-aff724dc7653] Proteína Texturizada de Soja Sabor Carne Natural Life 400g
-      BM25 Score: 6.0449, GT Score: 6.0
+      Score: 6.0449, GT Score: 6.0
    8. [91ff8f36-f6df-4277-ad47-622cee5313bf] Proteína da Soja Texturizada Média Siamar 300g
-      BM25 Score: 5.9091, GT Score: 6.0
+      Score: 5.9091, GT Score: 6.0
    9. [78415ebb-1f58-4670-a865-4d863343e77e] Sachê Ração Úmida High Proteína Cães Adultos Carne E Frango ...
-      BM25 Score: 5.7602, GT Score: 1.0
+      Score: 5.7602, GT Score: 1.0
   10. [bf57debc-fc10-4c83-96bd-bd97bfc90909] Ração Úmida Pedigree Sachê High Proteína Cães Adultos Porco ...
-      BM25 Score: 5.6730, GT Score: 1.0
+      Score: 5.6730, GT Score: 1.0
 
 Ground Truth (Top 10):
    1. [cab78d9d-3bf8-4013-b0d7-60c95c1d8c1a] Bowl Arroz Integral com Faláfel (vegano)
@@ -839,90 +783,72 @@ Ground Truth (Top 10):
       GT Score: 5.0
    9. [50325246-c1c9-44e8-96b2-d1ab126fe82d] Barra trufada | pistache
       GT Score: 5.0
-  10. [7676d569-620d-4f56-bcfb-5777992f72a3] Cogumelos
-      GT Score: 4.0
 
 
 Query 4: Almoço estilo havaiano
 --------------------------------------------------------------------------------
 Metrics:
-  Precision@5: 1.0000, Recall@5: 0.0694, NDCG@5: 0.5371, Coverage@5: 0.0694
-  Precision@10: 1.0000, Recall@10: 0.1389, NDCG@10: 0.6587, Coverage@10: 0.1389
-  MRR: 1.0000
+  Precision@5: 0.0000, Recall@5: 0.0000, NDCG@5: 0.5371
+  Precision@10: 0.0000, Recall@10: 0.0000, NDCG@10: 0.6587
+  MRR: 0.0000
 
 Retrieved Results (Top 10):
    1. [581059a8-1efb-4669-8033-45de8ea76091] Refrigerante 2lts
-      BM25 Score: 7.2148, GT Score: 3.0
+      Score: 7.2148, GT Score: 3.0
    2. [970acd9e-719f-4b62-9d1a-3b6a2d630300] Parmegiana de frango - P
-      BM25 Score: 6.1640, GT Score: 3.0
+      Score: 6.1640, GT Score: 3.0
    3. [b536d3ab-57fb-4b04-bd36-e4418ab388e7] Super Peixe Escabeche
-      BM25 Score: 5.6185, GT Score: 3.0
+      Score: 5.6185, GT Score: 3.0
    4. [8be20240-a88f-4d36-bf6c-d785924a3f9c] Ovo de Páscoa ao Leite Mochila Bob Esponja 170g
-      BM25 Score: 5.4487, GT Score: 1.0
+      Score: 5.4487, GT Score: 1.0
    5. [ebd63395-5e7a-4061-b1d7-f937f662b0e7] Feijoada completa média
-      BM25 Score: 5.3804, GT Score: 1.0
+      Score: 5.3804, GT Score: 1.0
    6. [6d8cd22c-5e98-4183-b0e9-1ec2b5ada77b] Maminha à moda da casa - a la carte
-      BM25 Score: 5.3217, GT Score: 3.0
+      Score: 5.3217, GT Score: 3.0
    7. [f16e13ea-be83-4dd1-94d5-5e89c552b210] Marmita P - Contra file + Batata frita (Ô Irresistível)
-      BM25 Score: 4.8962, GT Score: 3.0
+      Score: 4.8962, GT Score: 3.0
    8. [e30596f4-6ebe-4b02-8878-cd4fcdd4a4ae] 610 - Saint Peter à Vilalva
-      BM25 Score: 4.8341, GT Score: 3.0
+      Score: 4.8341, GT Score: 3.0
    9. [9afa7450-7199-472b-9cf3-d321ba6b8a8b] Fraldinha na Mostarda Djon
-      BM25 Score: 4.7735, GT Score: 3.0
+      Score: 4.7735, GT Score: 3.0
   10. [a54f2784-ab88-4014-96b8-15db4955781c] Pollo Fritto Con Mayo Al Pepe.
-      BM25 Score: 4.7735, GT Score: 3.0
+      Score: 4.7735, GT Score: 3.0
 
 Ground Truth (Top 10):
    1. [d253cc7b-95aa-453f-b048-2c83e2460c6e] Frango, batatas, maionese e arroz
       GT Score: 5.0
    2. [cf0d7d41-0653-419f-9518-e774ea079b45] Executivo Sobrecoxa Desossada Grelhada
       GT Score: 5.0
-   3. [3456d94e-aca7-41c4-b77d-64a0067c166c] Marmita Frango H2
-      GT Score: 4.0
-   4. [ebad5da7-439e-47f2-ae56-f583677147ef] Sanduba Frango Caprese Caesar
-      GT Score: 4.0
-   5. [f4050bf2-0b1e-4cde-af19-8aedb2ce8b7b] Executivo tilápia grelhada
-      GT Score: 4.0
-   6. [581059a8-1efb-4669-8033-45de8ea76091] Refrigerante 2lts
-      GT Score: 3.0
-   7. [970acd9e-719f-4b62-9d1a-3b6a2d630300] Parmegiana de frango - P
-      GT Score: 3.0
-   8. [b536d3ab-57fb-4b04-bd36-e4418ab388e7] Super Peixe Escabeche
-      GT Score: 3.0
-   9. [6d8cd22c-5e98-4183-b0e9-1ec2b5ada77b] Maminha à moda da casa - a la carte
-      GT Score: 3.0
-  10. [f16e13ea-be83-4dd1-94d5-5e89c552b210] Marmita P - Contra file + Batata frita (Ô Irresistível)
-      GT Score: 3.0
 
 
 Query 34: comida de rua libanesa
 --------------------------------------------------------------------------------
 Metrics:
-  Precision@5: 1.0000, Recall@5: 0.0510, NDCG@5: 0.1639, Coverage@5: 0.0510
-  Precision@10: 1.0000, Recall@10: 0.1020, NDCG@10: 0.1887, Coverage@10: 0.1020
-  MRR: 1.0000
+  Precision@5: 0.0000, Recall@5: 0.0000, NDCG@5: 0.1639
+  Precision@10: 0.0000, Recall@10: 0.0000, NDCG@10: 0.1887
+  MRR: 0.0000
 
 Retrieved Results (Top 10):
    1. [2b0b8139-b740-4319-802c-542a2c54f377] Marmita  Fricassé de frango (109)
-      BM25 Score: 7.8545, GT Score: 1.0
+      Score: 7.8545, GT Score: 1.0
    2. [5f512750-f744-4a26-8982-034d97530f98] Filé de Tilapia - Mini
-      BM25 Score: 6.4914, GT Score: 1.0
+      Score: 6.4914, GT Score: 1.0
    3. [a44f6c5e-1eff-4f8b-a237-263cbc336108] Frango Xadrez Ex Grande Cbn
-      BM25 Score: 6.1411, GT Score: 1.0
+      Score: 6.1411, GT Score: 1.0
    4. [17f1a3b3-03ec-4b0f-8b33-3270b96eb122] Almôndegas
-      BM25 Score: 6.0140, GT Score: 1.0
+      Score: 6.0140, GT Score: 1.0
    5. [24bada3c-1784-41c6-b9d0-e762edb1dc92] Lanche N 31 X-Búrguer
-      BM25 Score: 5.6116, GT Score: 1.0
+      Score: 5.6116, GT Score: 1.0
    6. [a0cc2954-c1ac-4c55-a48e-ac22ecd8a380] Double Paulão
-      BM25 Score: 5.5793, GT Score: 1.0
+      Score: 5.5793, GT Score: 1.0
    7. [bcd28d93-01e7-4948-a7f9-e54e378eb168] Big Dog Bacon E Cheddar
-      BM25 Score: 5.2862, GT Score: 1.0
+      Score: 5.2862, GT Score: 1.0
    8. [a79fc83e-4b8e-42f2-97fb-8bf3452454a1] Ovo Frito (2 unidades)
-      BM25 Score: 4.8377, GT Score: 1.0
+      Score: 4.8377, GT Score: 1.0
    9. [d2ff747e-5178-419e-9698-437eaef31ce5] Bife acebolado em tiras
-      BM25 Score: 4.1372, GT Score: 1.0
+      Score: 4.1372, GT Score: 1.0
   10. [3456d94e-aca7-41c4-b77d-64a0067c166c] Marmita Frango H2
-      BM25 Score: 4.1193, GT Score: 1.0
+      Score: 4.1193, GT Score: 1.0
 
 Ground Truth (Top 10):
    1. [5f64383a-c66d-4229-bf8f-5cd1438e18ab] Coalhada seca com Zaata Libanês - 150gr
@@ -933,204 +859,140 @@ Ground Truth (Top 10):
       GT Score: 5.0
    4. [14b2749a-8fd8-481e-8a3a-2ec1c9e0e20a] Kibe cru 150g Hortelã e cebola . Não campanha pão sírio.
       GT Score: 5.0
-   5. [5d85ee83-a364-4424-9198-d366aa643f99] Combo de Esfihas Nº01 (10 Esfiha de Carne + 10 Esf de Queijo...
-      GT Score: 4.0
-   6. [a908f81e-4369-485f-8de3-338c504b778a] Molho Lebanese honey mustard 30ml
-      GT Score: 4.0
-   7. [d24b96aa-bba0-488e-9c7d-401de94b3b73] 100 - Árabe
-      GT Score: 4.0
-   8. [2fadcdcc-448a-4b82-8ed7-be893b20ba31] Falafel egípcio com mistura egípcia
-      GT Score: 4.0
-   9. [d0e87147-3327-42dd-a087-b166ed595243] Segunda sem Carne - Wrap Falafel & Homus
-      GT Score: 4.0
-  10. [7904696d-2645-415e-a025-5246345ec0ad] Promo da Quarta - Burrito Classic
-      GT Score: 3.0
 
 
 Query 35: tigela de curry japonesa
 --------------------------------------------------------------------------------
 Metrics:
-  Precision@5: 1.0000, Recall@5: 0.0556, NDCG@5: 0.8688, Coverage@5: 0.0556
-  Precision@10: 0.9000, Recall@10: 0.1000, NDCG@10: 0.6934, Coverage@10: 0.1000
+  Precision@5: 0.2000, Recall@5: 1.0000, NDCG@5: 0.8688
+  Precision@10: 0.1000, Recall@10: 1.0000, NDCG@10: 0.6934
   MRR: 1.0000
 
 Retrieved Results (Top 10):
    1. [f59f0246-ebd0-4f57-9998-543ca470200c] Curry de grão de bico
-      BM25 Score: 11.1345, GT Score: 5.0
+      Score: 11.1345, GT Score: 5.0
    2. [7d83cceb-41bc-4ba8-89f4-d3d23d11e6c3] 1.000ml Montado / açaí, banana, leite Ninho e granola + 3 ca...
-      BM25 Score: 8.1872, GT Score: 1.0
+      Score: 8.1872, GT Score: 1.0
    3. [54688b98-dfe4-42c3-9b64-25db9eae8a0e] Poke Tropical
-      BM25 Score: 5.4245, GT Score: 3.0
+      Score: 5.4245, GT Score: 3.0
    4. [1ed05921-c269-4f3d-a46e-5cbe1d1c75a4] Festival Kaizen Sushi Premium - Para 2 pessoas
-      BM25 Score: 3.6765, GT Score: 3.0
+      Score: 3.6765, GT Score: 3.0
    5. [6654271f-9885-4400-a0ff-6d708fc269c2] 42 unidades hot holl de salmão grelhado
-      BM25 Score: 3.5675, GT Score: 4.0
+      Score: 3.5675, GT Score: 4.0
    6. [675b7d70-c855-4ee1-9275-e950b2a5260e] Big House - 56 peças
-      BM25 Score: 0.6170, GT Score: 1.0
+      Score: 0.6170, GT Score: 1.0
    7. [74f49765-6dbf-434d-ad10-2f70d5a374dd] Mousse de doce de leite com coco
-      BM25 Score: 0.5884, GT Score: 1.0
+      Score: 0.5884, GT Score: 1.0
    8. [45f9f2b2-e106-48fa-8a5d-5f54af6247b2] Trufado
-      BM25 Score: 0.5828, GT Score: 1.0
+      Score: 0.5828, GT Score: 1.0
    9. [17d3cd5e-28af-4fb8-a362-e81be713e4b6] Porção de Coração de Frango
-      BM25 Score: 0.5819, GT Score: 1.0
+      Score: 0.5819, GT Score: 1.0
   10. [9e8164b7-ff63-4172-9b22-25634140ba76] Torta de Sorvete Pedaço Super
-      BM25 Score: 0.5810, GT Score: 0.0
+      Score: 0.5810, GT Score: 0.0
 
 Ground Truth (Top 10):
    1. [f59f0246-ebd0-4f57-9998-543ca470200c] Curry de grão de bico
       GT Score: 5.0
-   2. [6654271f-9885-4400-a0ff-6d708fc269c2] 42 unidades hot holl de salmão grelhado
-      GT Score: 4.0
-   3. [54688b98-dfe4-42c3-9b64-25db9eae8a0e] Poke Tropical
-      GT Score: 3.0
-   4. [1ed05921-c269-4f3d-a46e-5cbe1d1c75a4] Festival Kaizen Sushi Premium - Para 2 pessoas
-      GT Score: 3.0
-   5. [f2dcec9b-4149-4220-bf10-00c8b0a04c06] Combo Toru 50 peças
-      GT Score: 3.0
-   6. [8f35be3b-d3fd-43f0-9988-29f55ccde9d6] 1 Temaki + 10 Hot Rolls
-      GT Score: 3.0
-   7. [e5702dc0-2000-4257-8730-8a9308798811] Temaki Shimeji
-      GT Score: 3.0
-   8. [a2d3e2a5-3dff-4849-8322-6eec8786f9d4] Kit Quente 1 Pessoa 18 Pçs
-      GT Score: 3.0
-   9. [7676d569-620d-4f56-bcfb-5777992f72a3] Cogumelos
-      GT Score: 3.0
-  10. [9cc4f61f-f543-4e7b-9f30-2cb00c085e1b] Joy Salmão Crispy Couve
-      GT Score: 3.0
 
 
 Query 96: Arroz temperado do norte da África
 --------------------------------------------------------------------------------
 Metrics:
-  Precision@5: 1.0000, Recall@5: 0.0515, NDCG@5: 0.5040, Coverage@5: 0.0515
-  Precision@10: 1.0000, Recall@10: 0.1031, NDCG@10: 0.5524, Coverage@10: 0.1031
-  MRR: 1.0000
+  Precision@5: 0.0000, Recall@5: 0.0000, NDCG@5: 0.5040
+  Precision@10: 0.0000, Recall@10: 0.0000, NDCG@10: 0.5524
+  MRR: 0.0000
 
 Retrieved Results (Top 10):
    1. [e1b7b3a0-64aa-4138-88cc-31716a0e76ab] 2x Carolina do Norte + 2x Batatas Grátis
-      BM25 Score: 12.6374, GT Score: 1.0
+      Score: 12.6374, GT Score: 1.0
    2. [5b36cfe5-4231-401c-ba3e-eed9441df700] Omelete Tradicional
-      BM25 Score: 10.3888, GT Score: 2.0
+      Score: 10.3888, GT Score: 2.0
    3. [dba05d85-d9d4-48fb-bba4-2c44de1dac48] Marmita - Prato Feito Filé De Frango Grelhado Temperado (Ser...
-      BM25 Score: 9.3434, GT Score: 3.0
+      Score: 9.3434, GT Score: 3.0
    4. [a94f95a6-fab9-4c95-93d5-59ab35442a14] Frango a milanesa ao barbecue
-      BM25 Score: 9.3295, GT Score: 2.0
+      Score: 9.3295, GT Score: 2.0
    5. [96ac5b40-61dc-4c0d-8d0c-c407ea047b27] Marmita P Tilápia grelhada c/ Mix de Legumes
-      BM25 Score: 7.7833, GT Score: 3.0
+      Score: 7.7833, GT Score: 3.0
    6. [70ee6e32-38ef-4188-9dc0-fb2b53bfa702] Marmita M Strogonoff
-      BM25 Score: 7.7134, GT Score: 3.0
+      Score: 7.7134, GT Score: 3.0
    7. [c79ee752-4f4b-4ea4-b8dc-718d75455056] Penne à Bolognesa e Bacon
-      BM25 Score: 7.6325, GT Score: 1.0
+      Score: 7.6325, GT Score: 1.0
    8. [38b02c65-7508-42cf-9876-9d63173bf561] Filé de tilapia amilanesa pequena
-      BM25 Score: 7.5751, GT Score: 1.0
+      Score: 7.5751, GT Score: 1.0
    9. [c04a7f16-32c1-401c-a5b5-77edc9fa2a74] Marmitex Contra filé Grelhado
-      BM25 Score: 7.3681, GT Score: 3.0
+      Score: 7.3681, GT Score: 3.0
   10. [b21d1110-c4e1-4217-b084-9990263f4626] Frango ao creme de palmito (Empanado)
-      BM25 Score: 7.3387, GT Score: 2.0
+      Score: 7.3387, GT Score: 2.0
 
 Ground Truth (Top 10):
    1. [dc1ea271-599f-495a-a011-2ca79cfcf3d2] Arroz com Cordeiro no Vinho (400g)
       GT Score: 5.0
-   2. [10892c0e-0402-4c97-8e4e-7f1f96dc6893] Filé de Frango Grelhado (P) + Saladinha
-      GT Score: 4.0
-   3. [dba05d85-d9d4-48fb-bba4-2c44de1dac48] Marmita - Prato Feito Filé De Frango Grelhado Temperado (Ser...
-      GT Score: 3.0
-   4. [96ac5b40-61dc-4c0d-8d0c-c407ea047b27] Marmita P Tilápia grelhada c/ Mix de Legumes
-      GT Score: 3.0
-   5. [70ee6e32-38ef-4188-9dc0-fb2b53bfa702] Marmita M Strogonoff
-      GT Score: 3.0
-   6. [c04a7f16-32c1-401c-a5b5-77edc9fa2a74] Marmitex Contra filé Grelhado
-      GT Score: 3.0
-   7. [075e1891-c3d4-4829-bc4d-27434beef6c4] Combo 3
-      GT Score: 3.0
-   8. [3b16067e-e0a6-4e6e-ab20-c5c56eeb1c83] Filé de Frango Grelhado
-      GT Score: 3.0
-   9. [cf0d7d41-0653-419f-9518-e774ea079b45] Executivo Sobrecoxa Desossada Grelhada
-      GT Score: 3.0
-  10. [bfa32b03-d273-4c6e-ad13-38145646ad7d] Linguiça calabresa acebolada
-      GT Score: 3.0
 
 
 Query 86: Clássico de bistrô francês
 --------------------------------------------------------------------------------
 Metrics:
-  Precision@5: 1.0000, Recall@5: 0.0556, NDCG@5: 0.5875, Coverage@5: 0.0556
-  Precision@10: 1.0000, Recall@10: 0.1111, NDCG@10: 0.6076, Coverage@10: 0.1111
-  MRR: 1.0000
+  Precision@5: 0.0000, Recall@5: 0.0000, NDCG@5: 0.5875
+  Precision@10: 0.0000, Recall@10: 0.0000, NDCG@10: 0.6076
+  MRR: 0.0000
 
 Retrieved Results (Top 10):
    1. [366c3e43-6855-4716-90ff-af2d67a5d97a] Pão Francês  380
-      BM25 Score: 9.2250, GT Score: 3.0
+      Score: 9.2250, GT Score: 3.0
    2. [5880974b-eee3-4551-a1df-d17397aed040] Pão Francês (6 unidades)
-      BM25 Score: 8.5326, GT Score: 3.0
+      Score: 8.5326, GT Score: 3.0
    3. [3b47acf8-a489-4073-8415-dbd07f9448e1] Pão Francês (4und) + 200g Muçarela Fatiada
-      BM25 Score: 7.3460, GT Score: 3.0
+      Score: 7.3460, GT Score: 3.0
    4. [aa6cd742-8db6-4772-9453-28a2992d9ff5] 03 ovos mexidos, acompanhados de pão francês
-      BM25 Score: 6.9451, GT Score: 3.0
+      Score: 6.9451, GT Score: 3.0
    5. [7fec8939-2066-45e5-8ab9-2ab9185df557] Pão Francês      Kg
-      BM25 Score: 6.8269, GT Score: 3.0
+      Score: 6.8269, GT Score: 3.0
    6. [2bb28711-2e18-4163-b635-98e5c3909459] Pão Francês      Kg
-      BM25 Score: 6.8269, GT Score: 3.0
+      Score: 6.8269, GT Score: 3.0
    7. [98bc2ad7-30fe-4f39-a9b2-a84312d558b4] Lanche De Linguiça
-      BM25 Score: 6.7128, GT Score: 2.0
+      Score: 6.7128, GT Score: 2.0
    8. [e5d16f42-ab5b-4da4-9eb4-f6029ca55338] Lanche de Pernil
-      BM25 Score: 6.6024, GT Score: 1.0
+      Score: 6.6024, GT Score: 1.0
    9. [f3488073-c4fb-45df-9613-0f8edc30b971] Pão francês (10 und)
-      BM25 Score: 6.5906, GT Score: 3.0
+      Score: 6.5906, GT Score: 3.0
   10. [18b35b6a-a691-4f53-9f85-6f4cae203592] Ovo mexido
-      BM25 Score: 6.4785, GT Score: 3.0
+      Score: 6.4785, GT Score: 3.0
 
 Ground Truth (Top 10):
    1. [d4fe2d30-a824-4071-8bb7-9e70ab984db6] Croissant de manteiga tipo francês 70g
       GT Score: 6.0
    2. [8df11455-efc9-4775-9a3b-bafd57410fa3] Medalhão De Mignon
       GT Score: 6.0
-   3. [ffa406a1-2cc4-43be-af7b-5ebc85ed1ad9] Café em Grão Coffee ++ Clássico 250g
-      GT Score: 4.0
-   4. [6f5aa297-57d4-434f-a7c5-cc5ad6567030] Pudim Gourmet
-      GT Score: 4.0
-   5. [e790096e-b8f8-4477-9400-a6628e04ce15] Strogonoff de Filé Mignon P/ 2 Pessoas + Acompanhamentos a e...
-      GT Score: 4.0
-   6. [20ba3de5-2d2d-483a-aa4e-4cd90ca953d6] Filé Caipirão
-      GT Score: 4.0
-   7. [76f76ad7-2f11-4e11-9d42-cd780f3a4f12] Filé Mignon a milanesa, molho branco 2 queijos, ervilha fres...
-      GT Score: 4.0
-   8. [683fe2a1-05b1-450f-909d-2f3b2ffb00ed] 2304 -Filé à Vilalva
-      GT Score: 4.0
-   9. [366c3e43-6855-4716-90ff-af2d67a5d97a] Pão Francês  380
-      GT Score: 3.0
-  10. [5880974b-eee3-4551-a1df-d17397aed040] Pão Francês (6 unidades)
-      GT Score: 3.0
 
 
 Query 100: Lanche reconfortante para a madrugada
 --------------------------------------------------------------------------------
 Metrics:
-  Precision@5: 1.0000, Recall@5: 0.0568, NDCG@5: 0.7047, Coverage@5: 0.0568
-  Precision@10: 1.0000, Recall@10: 0.1136, NDCG@10: 0.7392, Coverage@10: 0.1136
+  Precision@5: 1.0000, Recall@5: 0.2000, NDCG@5: 0.7047
+  Precision@10: 0.9000, Recall@10: 0.4000, NDCG@10: 0.7392
   MRR: 1.0000
 
 Retrieved Results (Top 10):
    1. [c842f813-78eb-4363-9d8f-d89a1e7f9716] Feijão
-      BM25 Score: 8.3743, GT Score: 5.0
+      Score: 8.3743, GT Score: 5.0
    2. [0a639ea9-3ac3-4c5d-90bd-80d9aad3e4fb] Porção de Batata Frita
-      BM25 Score: 8.0788, GT Score: 8.0
+      Score: 8.0788, GT Score: 8.0
    3. [b2a83a0a-3755-49c1-96e5-8c0539ab3975] Snack Barbecue - Valor referente a cada 100gr
-      BM25 Score: 8.0548, GT Score: 6.0
+      Score: 8.0548, GT Score: 6.0
    4. [3974c3df-d562-43d6-852a-026ef0fa236a] Big Chicken
-      BM25 Score: 7.7991, GT Score: 8.0
+      Score: 7.7991, GT Score: 8.0
    5. [e8a78e42-df66-42a0-96f1-9781303d4945] Lanche Natural de Peito de Peru
-      BM25 Score: 7.3579, GT Score: 5.0
+      Score: 7.3579, GT Score: 5.0
    6. [1b0e9690-40a0-472e-9c87-e1fd94313d92] Batata frita 200g
-      BM25 Score: 7.1688, GT Score: 7.0
+      Score: 7.1688, GT Score: 7.0
    7. [2242aea4-18c2-4c66-b366-a03b07e7cc9a] Frango
-      BM25 Score: 7.1438, GT Score: 7.0
+      Score: 7.1438, GT Score: 7.0
    8. [5d44ec83-e0fc-41f1-93c2-24495029eb04] Porção de bolinho de bacalhau 12 unidades
-      BM25 Score: 6.9703, GT Score: 8.0
+      Score: 6.9703, GT Score: 8.0
    9. [5680574d-c3e2-413f-994b-a7ace937ba8e] X Bacon Artesanal do Rei
-      BM25 Score: 6.7376, GT Score: 8.0
+      Score: 6.7376, GT Score: 8.0
   10. [33c12e78-133f-4f1c-aae9-fd7cd4cc5b4d] Spirulina - valor referente a cada 100gr
-      BM25 Score: 6.7157, GT Score: 2.0
+      Score: 6.7157, GT Score: 2.0
 
 Ground Truth (Top 10):
    1. [6a8092f2-1e5a-43a1-9109-6b4322fa2f3a] Lanche Smash Double Cheddar & Bacon
@@ -1158,31 +1020,31 @@ Ground Truth (Top 10):
 Query 97: Prato para almoço de escritório
 --------------------------------------------------------------------------------
 Metrics:
-  Precision@5: 1.0000, Recall@5: 0.0568, NDCG@5: 0.7886, Coverage@5: 0.0568
-  Precision@10: 1.0000, Recall@10: 0.1136, NDCG@10: 0.8238, Coverage@10: 0.1136
+  Precision@5: 0.8000, Recall@5: 0.2000, NDCG@5: 0.7886
+  Precision@10: 0.9000, Recall@10: 0.1000, NDCG@10: 0.8238
   MRR: 1.0000
 
 Retrieved Results (Top 10):
    1. [a607f3d6-0b3c-4778-bbea-4fff2c3a5062] Filet de Frango Grelhado 2 pessoas
-      BM25 Score: 13.0243, GT Score: 9.0
+      Score: 13.0243, GT Score: 9.0
    2. [a510c525-2ed4-4dbf-a071-2d31e86f4748] Prato Descartável Copomais 15cm Embalagem 10 Un
-      BM25 Score: 7.2328, GT Score: 8.0
+      Score: 7.2328, GT Score: 8.0
    3. [581059a8-1efb-4669-8033-45de8ea76091] Refrigerante 2lts
-      BM25 Score: 7.2148, GT Score: 3.0
+      Score: 7.2148, GT Score: 3.0
    4. [970acd9e-719f-4b62-9d1a-3b6a2d630300] Parmegiana de frango - P
-      BM25 Score: 6.6229, GT Score: 8.0
+      Score: 6.6229, GT Score: 8.0
    5. [bcf21bd0-e8af-4528-927d-9567394fa305] 2 Ovos
-      BM25 Score: 6.0976, GT Score: 5.0
+      Score: 6.0976, GT Score: 5.0
    6. [13ae97f2-e0ca-4bc9-8510-12176b3686d0] Prato Descartável Raso Platex 22cm Branco Embalagem 10 Un
-      BM25 Score: 5.8822, GT Score: 8.0
+      Score: 5.8822, GT Score: 8.0
    7. [a7715e50-694b-45cd-bdc8-1e0143af8258] Feijoada Para 2 Pessoas
-      BM25 Score: 5.8271, GT Score: 8.0
+      Score: 5.8271, GT Score: 8.0
    8. [dfe5ba7e-430e-444c-bc28-bc2805918b08] Peixe Filé de merluza
-      BM25 Score: 5.7551, GT Score: 8.0
+      Score: 5.7551, GT Score: 8.0
    9. [955a46bc-9cc9-4592-aa62-cdcd563d40a7] Queijo Prato Fatiado Soltíssimo Sadia 150g
-      BM25 Score: 5.7006, GT Score: 8.0
+      Score: 5.7006, GT Score: 8.0
   10. [b536d3ab-57fb-4b04-bd36-e4418ab388e7] Super Peixe Escabeche
-      BM25 Score: 5.6185, GT Score: 8.0
+      Score: 5.6185, GT Score: 8.0
 
 Ground Truth (Top 10):
    1. [a607f3d6-0b3c-4778-bbea-4fff2c3a5062] Filet de Frango Grelhado 2 pessoas
@@ -1210,31 +1072,31 @@ Ground Truth (Top 10):
 Query 92: Comida de rua do mercado noturno
 --------------------------------------------------------------------------------
 Metrics:
-  Precision@5: 0.4000, Recall@5: 0.0225, NDCG@5: 0.2199, Coverage@5: 0.0225
-  Precision@10: 0.5000, Recall@10: 0.0562, NDCG@10: 0.2667, Coverage@10: 0.0562
-  MRR: 1.0000
+  Precision@5: 0.0000, Recall@5: 0.0000, NDCG@5: 0.2199
+  Precision@10: 0.1000, Recall@10: 0.0000, NDCG@10: 0.2667
+  MRR: 0.1000
 
 Retrieved Results (Top 10):
    1. [5f512750-f744-4a26-8982-034d97530f98] Filé de Tilapia - Mini
-      BM25 Score: 9.1797, GT Score: 3.0
+      Score: 9.1797, GT Score: 3.0
    2. [2b0b8139-b740-4319-802c-542a2c54f377] Marmita  Fricassé de frango (109)
-      BM25 Score: 7.8545, GT Score: 3.0
+      Score: 7.8545, GT Score: 3.0
    3. [edf07bea-704d-4d75-b10d-b0cccaa614a6] Absorvente Noturno para Incontinência Urinária Poise 8un
-      BM25 Score: 7.3371, GT Score: 0.0
+      Score: 7.3371, GT Score: 0.0
    4. [12b183b7-73cb-4ee2-bce6-dd286ea62894] Absorvente Noturno Cobertura Seca com Abas Intimus 30un
-      BM25 Score: 6.9042, GT Score: 0.0
+      Score: 6.9042, GT Score: 0.0
    5. [a7cb3d43-fd75-49c1-a1c5-d249ab9b550d] Absorvente Extra Proteção Noturno com Abas Intimus 16un
-      BM25 Score: 6.9042, GT Score: 0.0
+      Score: 6.9042, GT Score: 0.0
    6. [9806a402-477a-47bd-917a-9aebedf842e2] Absorvente Noturno Cobertura Seca com Abas Intimus 30un
-      BM25 Score: 6.9042, GT Score: 0.0
+      Score: 6.9042, GT Score: 0.0
    7. [29c4419a-61eb-492d-a1d4-f9fba8e8128d] Absorvente Noturno Cobertura Seca com Abas Intimus 30un
-      BM25 Score: 6.8038, GT Score: 0.0
+      Score: 6.8038, GT Score: 0.0
    8. [a44f6c5e-1eff-4f8b-a237-263cbc336108] Frango Xadrez Ex Grande Cbn
-      BM25 Score: 6.1411, GT Score: 3.0
+      Score: 6.1411, GT Score: 3.0
    9. [17f1a3b3-03ec-4b0f-8b33-3270b96eb122] Almôndegas
-      BM25 Score: 6.0140, GT Score: 4.0
+      Score: 6.0140, GT Score: 4.0
   10. [24bada3c-1784-41c6-b9d0-e762edb1dc92] Lanche N 31 X-Búrguer
-      BM25 Score: 5.6116, GT Score: 5.0
+      Score: 5.6116, GT Score: 5.0
 
 Ground Truth (Top 10):
    1. [f5817dda-5d6c-48f3-a6cd-460991d0c399] Espetinho de Carne
@@ -1262,31 +1124,31 @@ Ground Truth (Top 10):
 Query 82: Combo de lanches para noite de cinema
 --------------------------------------------------------------------------------
 Metrics:
-  Precision@5: 1.0000, Recall@5: 0.0575, NDCG@5: 0.9400, Coverage@5: 0.0575
-  Precision@10: 1.0000, Recall@10: 0.1149, NDCG@10: 0.8406, Coverage@10: 0.1149
+  Precision@5: 1.0000, Recall@5: 0.6000, NDCG@5: 0.9400
+  Precision@10: 0.9000, Recall@10: 0.4000, NDCG@10: 0.8406
   MRR: 1.0000
 
 Retrieved Results (Top 10):
    1. [5dfe2ebf-5cf8-46e6-b972-77bc8dc5e098] Combo de 4 Lanches + 1 refri 2l Grátis!
-      BM25 Score: 12.1612, GT Score: 9.0
+      Score: 12.1612, GT Score: 9.0
    2. [75612e81-8e9b-4da6-be60-f4b324c06f9d] Combo com 2 Lanches + Batata Grande + Refrigerante 1 Litro
-      BM25 Score: 12.0896, GT Score: 9.0
+      Score: 12.0896, GT Score: 9.0
    3. [f7145095-9544-4cc2-807b-64161d08e6e5] Pipoca para Micro-ondas Manteiga de Cinema Yoki 100g
-      BM25 Score: 11.3274, GT Score: 9.0
+      Score: 11.3274, GT Score: 9.0
    4. [7b05edd9-f611-491c-9369-83d4187d1fdc] Burger Duplo
-      BM25 Score: 9.4980, GT Score: 8.0
+      Score: 9.4980, GT Score: 8.0
    5. [19e796cf-1c3b-47f0-9c2b-e1daf8bd1793] Cheese Burguer + Coca Cola 350 ml
-      BM25 Score: 7.0928, GT Score: 6.0
+      Score: 7.0928, GT Score: 6.0
    6. [094b59ba-88a2-485c-ae97-fbaf09760855] 190-Combo Chipotle Burguer Jr
-      BM25 Score: 6.9477, GT Score: 8.0
+      Score: 6.9477, GT Score: 8.0
    7. [975f9eb1-b4ad-4097-9f7d-6860fb647dcc] Combo Costelinha Burguer
-      BM25 Score: 6.9405, GT Score: 7.0
+      Score: 6.9405, GT Score: 7.0
    8. [46ff747d-02ff-475a-b815-ba2329b699f6] Combo ( 2 Temakis De Salmão Grelhado + 20 Uramakis Salmão Gr...
-      BM25 Score: 6.9401, GT Score: 7.0
+      Score: 6.9401, GT Score: 7.0
    9. [a90e56f5-040d-4927-88a2-4fa82f952c3b] Drageado Bytes de Chocolate Branco Crocante 100g
-      BM25 Score: 6.9247, GT Score: 5.0
+      Score: 6.9247, GT Score: 5.0
   10. [9ae722c1-e9df-4326-ba47-3d4327386969] Naldecon Noite 4 Comprimidos
-      BM25 Score: 6.9097, GT Score: 1.0
+      Score: 6.9097, GT Score: 1.0
 
 Ground Truth (Top 10):
    1. [5dfe2ebf-5cf8-46e6-b972-77bc8dc5e098] Combo de 4 Lanches + 1 refri 2l Grátis!
@@ -1314,31 +1176,31 @@ Ground Truth (Top 10):
 Query 78: Refeição proteica pós-treino
 --------------------------------------------------------------------------------
 Metrics:
-  Precision@5: 1.0000, Recall@5: 0.0549, NDCG@5: 0.5638, Coverage@5: 0.0549
-  Precision@10: 1.0000, Recall@10: 0.1099, NDCG@10: 0.6684, Coverage@10: 0.1099
-  MRR: 1.0000
+  Precision@5: 0.8000, Recall@5: 0.0000, NDCG@5: 0.5638
+  Precision@10: 0.8000, Recall@10: 0.6000, NDCG@10: 0.6684
+  MRR: 0.5000
 
 Retrieved Results (Top 10):
    1. [0740adca-efce-4592-ae16-e547c3eb2f79] Loção Hidratante Pós Sol Calamed Aloe Vera 100ml
-      BM25 Score: 8.1025, GT Score: 1.0
+      Score: 8.1025, GT Score: 1.0
    2. [81d607d9-9d2f-4e3d-a0a2-18e8e1e49276] Barra Proteica Dobro Creme Papaia 25g
-      BM25 Score: 7.0837, GT Score: 7.0
+      Score: 7.0837, GT Score: 7.0
    3. [c868d7ed-53cf-403c-8835-6db6556ba392] Bebida Láctea Cappuccino Power Whey 3 Corações 260ml
-      BM25 Score: 6.7452, GT Score: 8.0
+      Score: 6.7452, GT Score: 8.0
    4. [404a878a-7e1c-46ed-ab9e-8f892af73ede] Bebida Láctea Energy Boost Café Expresso Yopro 250ml
-      BM25 Score: 6.4377, GT Score: 7.0
+      Score: 6.4377, GT Score: 7.0
    5. [d19f4c02-af5b-4cb9-933b-7f55a5d5f0a6] Bebida Proteica Energizante Com Aminoacidos E Cafeina Energy...
-      BM25 Score: 6.3413, GT Score: 8.0
+      Score: 6.3413, GT Score: 8.0
    6. [46882687-14ef-400a-8a1e-58e160d6c0a3] Yopro Bebida Láctea Uht Chocolate 25g de Proteínas 250ml
-      BM25 Score: 6.2478, GT Score: 9.0
+      Score: 6.2478, GT Score: 9.0
    7. [7c2fb899-945b-4639-a0f6-d5d5812a92ae] Bebida Láctea Cappuccino Power Whey Cookies N Cream 3 Coraçõ...
-      BM25 Score: 6.2478, GT Score: 8.0
+      Score: 6.2478, GT Score: 8.0
    8. [7714b3ea-58e3-4247-9173-b9239db6b805] Yopro Bebida Láctea Uht Chocolate 25g de Proteínas 250ml
-      BM25 Score: 6.2478, GT Score: 9.0
+      Score: 6.2478, GT Score: 9.0
    9. [8c1b3f28-1818-40fd-8133-b729696cedc0] Bebida Láctea Uht Whey 23g Piracanjuba Zero Lactose Amendoim...
-      BM25 Score: 5.9830, GT Score: 8.0
+      Score: 5.9830, GT Score: 8.0
   10. [c3c1706e-19eb-4bce-9953-78edb0efaa9f] Porção individual de Vinagrete
-      BM25 Score: 4.7237, GT Score: 1.0
+      Score: 4.7237, GT Score: 1.0
 
 Ground Truth (Top 10):
    1. [34001e6a-98d0-4bbb-a7aa-9deb4d9e5d53] Whey Gold 3w Cookies 30g Topway
@@ -1366,31 +1228,31 @@ Ground Truth (Top 10):
 Query 73: Comidas favoritas do estádio
 --------------------------------------------------------------------------------
 Metrics:
-  Precision@5: 1.0000, Recall@5: 0.0526, NDCG@5: 0.5202, Coverage@5: 0.0526
-  Precision@10: 0.9000, Recall@10: 0.0947, NDCG@10: 0.5174, Coverage@10: 0.0947
+  Precision@5: 0.4000, Recall@5: 0.0000, NDCG@5: 0.5202
+  Precision@10: 0.3000, Recall@10: 0.1000, NDCG@10: 0.5174
   MRR: 1.0000
 
 Retrieved Results (Top 10):
    1. [df483c7c-a554-4e44-bea3-a3138ea497dd] Feijoada completa
-      BM25 Score: 8.7347, GT Score: 6.0
+      Score: 8.7347, GT Score: 6.0
    2. [fb04c85d-35b7-4f38-8dac-57ec44514a2a] Vitaminas 300ml
-      BM25 Score: 7.9382, GT Score: 3.0
+      Score: 7.9382, GT Score: 3.0
    3. [b7d8fa12-2737-434d-84a4-800fbd531d36] Salada Crispy Caesar + Suco do Dia
-      BM25 Score: 4.4468, GT Score: 4.0
+      Score: 4.4468, GT Score: 4.0
    4. [6e60bc0a-94ec-4422-8b1a-2c6783d84234] Suco do Dia - Melancia 500ml
-      BM25 Score: 4.4114, GT Score: 3.0
+      Score: 4.4114, GT Score: 3.0
    5. [075e1891-c3d4-4829-bc4d-27434beef6c4] Combo 3
-      BM25 Score: 4.0521, GT Score: 5.0
+      Score: 4.0521, GT Score: 5.0
    6. [bf68bcc4-086f-4ef4-81e1-f250213b0e05] Camarão Grande Grelhado
-      BM25 Score: 3.8820, GT Score: 4.0
+      Score: 3.8820, GT Score: 4.0
    7. [a24d8ae4-99a6-487e-ba2b-f120291d1a47] Buquê Flores do Campo!
-      BM25 Score: 3.8591, GT Score: 0.0
+      Score: 3.8591, GT Score: 0.0
    8. [e1b7b3a0-64aa-4138-88cc-31716a0e76ab] 2x Carolina do Norte + 2x Batatas Grátis
-      BM25 Score: 3.8062, GT Score: 7.0
+      Score: 3.8062, GT Score: 7.0
    9. [eeb8aadd-300d-4d53-af86-6f8415256003] Pretzels Doce de Leite
-      BM25 Score: 3.7802, GT Score: 4.0
+      Score: 3.7802, GT Score: 4.0
   10. [cb24ebd5-2fa4-46c0-b6ec-72a3fb9e005f] Açaí no Copo
-      BM25 Score: 3.7802, GT Score: 3.0
+      Score: 3.7802, GT Score: 3.0
 
 Ground Truth (Top 10):
    1. [ef0c2f2b-157f-43d2-9d69-fe34ae6e0047] Hot-dog Calabresa - Bandeja
@@ -1418,31 +1280,31 @@ Ground Truth (Top 10):
 Query 71: Jantar familiar caseiro
 --------------------------------------------------------------------------------
 Metrics:
-  Precision@5: 1.0000, Recall@5: 0.0521, NDCG@5: 0.6636, Coverage@5: 0.0521
-  Precision@10: 1.0000, Recall@10: 0.1042, NDCG@10: 0.6995, Coverage@10: 0.1042
+  Precision@5: 1.0000, Recall@5: 0.2000, NDCG@5: 0.6636
+  Precision@10: 0.9000, Recall@10: 0.2000, NDCG@10: 0.6995
   MRR: 1.0000
 
 Retrieved Results (Top 10):
    1. [b52c5438-97c2-41ae-bae1-f7417a674acb] Refrigerante Guaraná Antarctica Lata 350ml
-      BM25 Score: 7.4710, GT Score: 5.0
+      Score: 7.4710, GT Score: 5.0
    2. [7ca73135-7a83-4c6d-8716-3219793d2234] Mima Bolo Caseiro cenoura
-      BM25 Score: 5.7025, GT Score: 8.0
+      Score: 5.7025, GT Score: 8.0
    3. [9dda8400-e0f6-4cc2-b3e8-d8a5f3b68bb2] Fubá com Goiabada
-      BM25 Score: 5.6874, GT Score: 5.0
+      Score: 5.6874, GT Score: 5.0
    4. [e30596f4-6ebe-4b02-8878-cd4fcdd4a4ae] 610 - Saint Peter à Vilalva
-      BM25 Score: 5.6695, GT Score: 6.0
+      Score: 5.6695, GT Score: 6.0
    5. [a1a54781-3b7a-4204-a47a-2429f6a77df2] Pão de Forma Caseiro Integral Qualitá 500g
-      BM25 Score: 5.3192, GT Score: 5.0
+      Score: 5.3192, GT Score: 5.0
    6. [2f35b58b-8993-4684-bf9e-fd807e4e2c04] Macarrão C/ Salsicha
-      BM25 Score: 5.1524, GT Score: 6.0
+      Score: 5.1524, GT Score: 6.0
    7. [4730b853-d11b-40ec-be19-1aef4a3f0c3b] Brigadeiro de chocolate
-      BM25 Score: 4.6430, GT Score: 7.0
+      Score: 4.6430, GT Score: 7.0
    8. [94588b47-a825-4686-b6f8-a1d4e5990777] Duplo Smash Salada Turbo
-      BM25 Score: 4.5783, GT Score: 4.0
+      Score: 4.5783, GT Score: 4.0
    9. [0904c310-45bf-4436-b1f3-cbf1200b9084] Bolo de cenoura com cobertura de chocolate
-      BM25 Score: 4.4542, GT Score: 6.0
+      Score: 4.4542, GT Score: 6.0
   10. [e12ecec6-dd78-47fe-a600-2a17a8185330] Combo 2 Parmegianas de Frango
-      BM25 Score: 4.3039, GT Score: 8.0
+      Score: 4.3039, GT Score: 8.0
 
 Ground Truth (Top 10):
    1. [2d5b67da-d285-42b1-9d67-98a49ec04de5] Bolo Caseiro de Leite Ninho
@@ -1470,31 +1332,31 @@ Ground Truth (Top 10):
 Query 66: Café da manhã rápido com bolos
 --------------------------------------------------------------------------------
 Metrics:
-  Precision@5: 1.0000, Recall@5: 0.0633, NDCG@5: 0.3496, Coverage@5: 0.0633
-  Precision@10: 1.0000, Recall@10: 0.1266, NDCG@10: 0.4250, Coverage@10: 0.1266
-  MRR: 1.0000
+  Precision@5: 0.0000, Recall@5: 0.0000, NDCG@5: 0.3496
+  Precision@10: 0.2000, Recall@10: 0.1000, NDCG@10: 0.4250
+  MRR: 0.1429
 
 Retrieved Results (Top 10):
    1. [a7c44253-12d3-4dae-9e18-ed70134205df] Ovos Mexidos
-      BM25 Score: 19.0712, GT Score: 3.0
+      Score: 19.0712, GT Score: 3.0
    2. [a98bea43-93ef-44bb-8ac6-836d754f0a92] Cafés Nico
-      BM25 Score: 18.9770, GT Score: 3.0
+      Score: 18.9770, GT Score: 3.0
    3. [56d13cdc-f76a-4412-a0b4-af09839b2689] Pão francês com presunto e queijo
-      BM25 Score: 16.7949, GT Score: 3.0
+      Score: 16.7949, GT Score: 3.0
    4. [2a6600a6-70d1-417d-a139-b89a28c7fb7d] Leite Fermentado Café da Manhã Morango Banana e Linhaça Acti...
-      BM25 Score: 15.7553, GT Score: 4.0
+      Score: 15.7553, GT Score: 4.0
    5. [f7feedba-8db8-4713-8cc0-8d5b0c4f5fef] Misto Quente
-      BM25 Score: 15.5158, GT Score: 3.0
+      Score: 15.5158, GT Score: 3.0
    6. [e90a5039-94b9-4ce4-8d89-bb362b67432c] Misto quente Com Ovo
-      BM25 Score: 15.4569, GT Score: 4.0
+      Score: 15.4569, GT Score: 4.0
    7. [86a220ca-a5b4-4df6-bd02-6aed29bd7981] Cesta de Mccafé da Manhã
-      BM25 Score: 14.2986, GT Score: 6.0
+      Score: 14.2986, GT Score: 6.0
    8. [c0785371-e009-42f6-a22d-33acf11c1201] Bolo Baby Vulcão
-      BM25 Score: 14.0421, GT Score: 8.0
+      Score: 14.0421, GT Score: 8.0
    9. [9033455a-4ac7-4a23-a399-de0e049164fe] Egg Cheese Bacon - Promo Mcd
-      BM25 Score: 13.9033, GT Score: 3.0
+      Score: 13.9033, GT Score: 3.0
   10. [148c2ee9-ddc7-42db-b342-639cacdaafc4] Queijo Quente Bacon
-      BM25 Score: 13.5703, GT Score: 3.0
+      Score: 13.5703, GT Score: 3.0
 
 Ground Truth (Top 10):
    1. [4c943c05-0e4a-422a-86f3-a990a1010d1d] Bolo de limão com calda de limão
@@ -1522,31 +1384,31 @@ Ground Truth (Top 10):
 Query 39: Café da manhã clássico
 --------------------------------------------------------------------------------
 Metrics:
-  Precision@5: 1.0000, Recall@5: 0.0769, NDCG@5: 0.8167, Coverage@5: 0.0769
-  Precision@10: 1.0000, Recall@10: 0.1538, NDCG@10: 0.8928, Coverage@10: 0.1538
+  Precision@5: 1.0000, Recall@5: 0.4000, NDCG@5: 0.8167
+  Precision@10: 1.0000, Recall@10: 0.8000, NDCG@10: 0.8928
   MRR: 1.0000
 
 Retrieved Results (Top 10):
    1. [a98bea43-93ef-44bb-8ac6-836d754f0a92] Cafés Nico
-      BM25 Score: 16.6139, GT Score: 6.0
+      Score: 16.6139, GT Score: 6.0
    2. [a7c44253-12d3-4dae-9e18-ed70134205df] Ovos Mexidos
-      BM25 Score: 16.0184, GT Score: 9.0
+      Score: 16.0184, GT Score: 9.0
    3. [56d13cdc-f76a-4412-a0b4-af09839b2689] Pão francês com presunto e queijo
-      BM25 Score: 14.0096, GT Score: 8.0
+      Score: 14.0096, GT Score: 8.0
    4. [2a6600a6-70d1-417d-a139-b89a28c7fb7d] Leite Fermentado Café da Manhã Morango Banana e Linhaça Acti...
-      BM25 Score: 13.7934, GT Score: 6.0
+      Score: 13.7934, GT Score: 6.0
    5. [f7feedba-8db8-4713-8cc0-8d5b0c4f5fef] Misto Quente
-      BM25 Score: 13.5837, GT Score: 8.0
+      Score: 13.5837, GT Score: 8.0
    6. [e90a5039-94b9-4ce4-8d89-bb362b67432c] Misto quente Com Ovo
-      BM25 Score: 12.4485, GT Score: 8.0
+      Score: 12.4485, GT Score: 8.0
    7. [86a220ca-a5b4-4df6-bd02-6aed29bd7981] Cesta de Mccafé da Manhã
-      BM25 Score: 12.3011, GT Score: 9.0
+      Score: 12.3011, GT Score: 9.0
    8. [9033455a-4ac7-4a23-a399-de0e049164fe] Egg Cheese Bacon - Promo Mcd
-      BM25 Score: 11.4884, GT Score: 8.0
+      Score: 11.4884, GT Score: 8.0
    9. [148c2ee9-ddc7-42db-b342-639cacdaafc4] Queijo Quente Bacon
-      BM25 Score: 11.2004, GT Score: 8.0
+      Score: 11.2004, GT Score: 8.0
   10. [3b47acf8-a489-4073-8415-dbd07f9448e1] Pão Francês (4und) + 200g Muçarela Fatiada
-      BM25 Score: 10.9266, GT Score: 9.0
+      Score: 10.9266, GT Score: 9.0
 
 Ground Truth (Top 10):
    1. [a7c44253-12d3-4dae-9e18-ed70134205df] Ovos Mexidos
@@ -1574,31 +1436,31 @@ Ground Truth (Top 10):
 Query 9: Lancheira estilo bento
 --------------------------------------------------------------------------------
 Metrics:
-  Precision@5: 0.6000, Recall@5: 0.0545, NDCG@5: 0.4204, Coverage@5: 0.0545
-  Precision@10: 0.7000, Recall@10: 0.1273, NDCG@10: 0.4440, Coverage@10: 0.1273
-  MRR: 1.0000
+  Precision@5: 0.2000, Recall@5: 0.3333, NDCG@5: 0.4204
+  Precision@10: 0.1000, Recall@10: 0.3333, NDCG@10: 0.4440
+  MRR: 0.2000
 
 Retrieved Results (Top 10):
    1. [8531137e-51be-405a-a90b-4457a7858bef] Bento Shimeji
-      BM25 Score: 10.1147, GT Score: 3.0
+      Score: 10.1147, GT Score: 3.0
    2. [8be20240-a88f-4d36-bf6c-d785924a3f9c] Ovo de Páscoa ao Leite Mochila Bob Esponja 170g
-      BM25 Score: 5.4487, GT Score: 2.0
+      Score: 5.4487, GT Score: 2.0
    3. [6d8cd22c-5e98-4183-b0e9-1ec2b5ada77b] Maminha à moda da casa - a la carte
-      BM25 Score: 5.3217, GT Score: 0.0
+      Score: 5.3217, GT Score: 0.0
    4. [e30961c7-c2b7-4477-8568-68bd5d31408b] Campinas Forasteira American IPA - Pet 1 Litro
-      BM25 Score: 4.3157, GT Score: 0.0
+      Score: 4.3157, GT Score: 0.0
    5. [002f4fdb-2e83-45d4-9bf8-a2e580d0a6b1] Caixa com 1 Bento Cake + 16 brigadeiros sortidos
-      BM25 Score: 4.1258, GT Score: 5.0
+      Score: 4.1258, GT Score: 5.0
    6. [c4a6f155-6ad9-4bad-a083-52d8c1895124] Little Porter - Dark Mild Ale - Lata 473ml
-      BM25 Score: 3.8760, GT Score: 0.0
+      Score: 3.8760, GT Score: 0.0
    7. [8e0b38e8-6679-4df0-8adb-bfb0d3e613a0] Geladinho Gourmet Ninho com Nutella
-      BM25 Score: 3.1745, GT Score: 1.0
+      Score: 3.1745, GT Score: 1.0
    8. [c8947b74-a3a6-4146-9b82-ac4c493eceb3] Copo da Felicidade Morango com Ninho e Nutella 300ml
-      BM25 Score: 2.7568, GT Score: 3.0
+      Score: 2.7568, GT Score: 3.0
    9. [ed29c625-ffe9-45dc-95d6-fa8976f5a0bc] Marmita de filé de frango
-      BM25 Score: 2.7538, GT Score: 3.0
+      Score: 2.7538, GT Score: 3.0
   10. [86329c27-60b7-45fb-b98f-29497fa90802] Donut's do Homer Simpsons
-      BM25 Score: 2.5536, GT Score: 1.0
+      Score: 2.5536, GT Score: 1.0
 
 Ground Truth (Top 10):
    1. [b93af04c-4053-43e6-a27e-8fc32df0fdb9] Bentô Frango Xadrez + Coca Cola 350ml
@@ -1607,18 +1469,4 @@ Ground Truth (Top 10):
       GT Score: 6.0
    3. [002f4fdb-2e83-45d4-9bf8-a2e580d0a6b1] Caixa com 1 Bento Cake + 16 brigadeiros sortidos
       GT Score: 5.0
-   4. [8531137e-51be-405a-a90b-4457a7858bef] Bento Shimeji
-      GT Score: 3.0
-   5. [c8947b74-a3a6-4146-9b82-ac4c493eceb3] Copo da Felicidade Morango com Ninho e Nutella 300ml
-      GT Score: 3.0
-   6. [ed29c625-ffe9-45dc-95d6-fa8976f5a0bc] Marmita de filé de frango
-      GT Score: 3.0
-   7. [76d314e2-0240-4b66-ad80-3eb83158296c] Lanche dona lurdes
-      GT Score: 3.0
-   8. [252373d9-89b4-485a-8dda-d790216ded09] Promoção da casa
-      GT Score: 3.0
-   9. [fe9beebd-cee2-4fb0-a81e-a54b07a39c2b] Salad Egg
-      GT Score: 3.0
-  10. [3aeb7744-c99d-43dc-883f-4eec44d7d85b] Lanche Natural Caprese
-      GT Score: 3.0
 

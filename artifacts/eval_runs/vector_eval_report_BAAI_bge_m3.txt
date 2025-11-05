@@ -20,6 +20,8 @@ Vector Parameters:
 Retrieval Parameters:
   Top-K: 10
   Evaluation K values: [5, 10]
+  Relevance Threshold: 5.0 (items with score >= 5.0 are considered relevant)
+  NDCG Threshold: 1.0 (items with score >= 1.0 are used for IDCG calculation)
 
 Dataset Configuration:
   Queries file: /Users/xianzhang/Documents/prosus/Food-Semantic-Search/data/test/30_queries.csv
@@ -45,26 +47,24 @@ Hardware Configuration:
 
 Latency Statistics:
 --------------------------------------------------------------------------------
-Average Latency: 46.95 ms
-Max Latency: 89.88 ms
-Min Latency: 33.89 ms
+Average Latency: 59.25 ms
+Max Latency: 284.47 ms
+Min Latency: 33.55 ms
 
 Aggregate Metrics:
 --------------------------------------------------------------------------------
 
 Metrics @ K=5:
-  Precision@5: 0.9800
-  Recall@5:    0.0598
+  Precision@5: 0.5067
+  Recall@5:    0.2244
   NDCG@5:      0.6697
-  Coverage@5:  0.0580
 
 Metrics @ K=10:
-  Precision@10: 0.9833
-  Recall@10:    0.1202
+  Precision@10: 0.4700
+  Recall@10:    0.3112
   NDCG@10:      0.6963
-  Coverage@10:  0.1184
 
-MRR: 0.9750
+MRR: 0.6400
 
 Per-Query Results:
 ================================================================================
@@ -72,8 +72,8 @@ Per-Query Results:
 Query 88: Desinfetante Uso Geral Lavanda Lysoform
 --------------------------------------------------------------------------------
 Metrics:
-  Precision@5: 1.0000, Recall@5: 0.0877, NDCG@5: 1.1466, Coverage@5: 0.0351
-  Precision@10: 1.0000, Recall@10: 0.1754, NDCG@10: 1.1370, Coverage@10: 0.1228
+  Precision@5: 1.0000, Recall@5: 1.0000, NDCG@5: 1.1466
+  Precision@10: 0.7000, Recall@10: 0.7778, NDCG@10: 1.1370
   MRR: 1.0000
 
 Retrieved Results (Top 10):
@@ -117,16 +117,14 @@ Ground Truth (Top 10):
       GT Score: 5.0
    9. [9e48093a-be3c-4dc1-9852-703ed4d9567e] Limpa Pisos Lavanda Diluível Oferta Destac 500ml
       GT Score: 5.0
-  10. [5ba790d8-b788-4d55-b7b9-1f429839ae0c] Desinfetante Uso Geral Citrus Lysoform 2l
-      GT Score: 4.0
 
 
 Query 6: Pão rústico do campo
 --------------------------------------------------------------------------------
 Metrics:
-  Precision@5: 1.0000, Recall@5: 0.0543, NDCG@5: 0.6413, Coverage@5: 0.0543
-  Precision@10: 1.0000, Recall@10: 0.1087, NDCG@10: 0.6703, Coverage@10: 0.1087
-  MRR: 1.0000
+  Precision@5: 0.0000, Recall@5: 0.0000, NDCG@5: 0.6413
+  Precision@10: 0.0000, Recall@10: 0.0000, NDCG@10: 0.6703
+  MRR: 0.0000
 
 Retrieved Results (Top 10):
    1. [9fbdf677-5918-4d7b-819d-3325682ac6d6] Pão de Forma Tradicional Bauducco 390g
@@ -153,32 +151,14 @@ Retrieved Results (Top 10):
 Ground Truth (Top 10):
    1. [6c040c45-559e-4aad-b0f7-269c41b56aaa] Baguete Crosta de Grãos
       GT Score: 6.0
-   2. [3d071aff-b100-402f-b016-e4c1f5838e03] Pão do Forno Na Chapa Wickbold 500g
-      GT Score: 4.0
-   3. [ef4fcc03-67f4-49fd-b389-4ef382e98e3c] Pão Integral Grão Castanha do Pará e Quinoa Wickbold 450g
-      GT Score: 4.0
-   4. [366c3e43-6855-4716-90ff-af2d67a5d97a] Pão Francês  380
-      GT Score: 4.0
-   5. [25db4a2e-2df9-4c8a-8c90-d9f28249f7b0] Pão Integral 50 gr
-      GT Score: 4.0
-   6. [0d76a840-f71f-4d1b-af95-2c87d88d3e0d] Pão Integral Aveia e Sementes Clássicas Nutrella 350g
-      GT Score: 4.0
-   7. [028aa4b0-f8c7-4173-9542-b6ea98e55ec5] Pão de Forma 100% Nutrição Sabor Grãos Girassol E Castanha 5...
-      GT Score: 4.0
-   8. [03d98f77-acca-405a-bf7f-ed4ef344a4d0] Pão de Forma 100% Nutrição Sabor Grãos Girassol E Castanha 5...
-      GT Score: 4.0
-   9. [e5cb02f0-d0fc-41a0-ac04-51691805edd5] Pão de Milho Panco 500g
-      GT Score: 4.0
-  10. [a24d8ae4-99a6-487e-ba2b-f120291d1a47] Buquê Flores do Campo!
-      GT Score: 3.0
 
 
 Query 13: Tigela de arroz crocante com proteína
 --------------------------------------------------------------------------------
 Metrics:
-  Precision@5: 1.0000, Recall@5: 0.0543, NDCG@5: 0.6760, Coverage@5: 0.0543
-  Precision@10: 1.0000, Recall@10: 0.1087, NDCG@10: 0.7034, Coverage@10: 0.1087
-  MRR: 1.0000
+  Precision@5: 0.2000, Recall@5: 0.2000, NDCG@5: 0.6760
+  Precision@10: 0.1000, Recall@10: 0.1429, NDCG@10: 0.7034
+  MRR: 0.3333
 
 Retrieved Results (Top 10):
    1. [3e6c1426-75cb-4373-997d-b93cc20b23f5] Filé Trufado
@@ -217,20 +197,14 @@ Ground Truth (Top 10):
       GT Score: 5.0
    7. [31fd2198-1bc8-49f8-b68e-b413ee89865b] Especial frango grelhado
       GT Score: 5.0
-   8. [e30596f4-6ebe-4b02-8878-cd4fcdd4a4ae] 610 - Saint Peter à Vilalva
-      GT Score: 4.0
-   9. [e0871f99-8ac6-4963-bf29-0fef71ab6759] Combo família (2 marmitas tradicionais + 1 refrigerantes 2 l...
-      GT Score: 4.0
-  10. [919958fd-97d9-444f-bc56-209786e9ec7a] Filé de Frango Especial  Com Acompanhamentos - Serve Bem Uma...
-      GT Score: 4.0
 
 
 Query 20: Peixe com batatas fritas no estilo pub
 --------------------------------------------------------------------------------
 Metrics:
-  Precision@5: 1.0000, Recall@5: 0.0581, NDCG@5: 0.6047, Coverage@5: 0.0581
-  Precision@10: 1.0000, Recall@10: 0.1163, NDCG@10: 0.6818, Coverage@10: 0.1163
-  MRR: 1.0000
+  Precision@5: 0.2000, Recall@5: 0.0000, NDCG@5: 0.6047
+  Precision@10: 0.3000, Recall@10: 0.2000, NDCG@10: 0.6818
+  MRR: 0.3333
 
 Retrieved Results (Top 10):
    1. [f0fcf6dd-fd86-457e-8490-097462ac81b3] Peixe frito
@@ -280,8 +254,8 @@ Ground Truth (Top 10):
 Query 26: Tigela de açaí com superalimentos
 --------------------------------------------------------------------------------
 Metrics:
-  Precision@5: 1.0000, Recall@5: 0.0704, NDCG@5: 0.6857, Coverage@5: 0.0704
-  Precision@10: 1.0000, Recall@10: 0.1408, NDCG@10: 0.7233, Coverage@10: 0.1408
+  Precision@5: 1.0000, Recall@5: 0.2000, NDCG@5: 0.6857
+  Precision@10: 1.0000, Recall@10: 0.3000, NDCG@10: 0.7233
   MRR: 1.0000
 
 Retrieved Results (Top 10):
@@ -332,9 +306,9 @@ Ground Truth (Top 10):
 Query 7: Asas de frango coreanas apimentadas
 --------------------------------------------------------------------------------
 Metrics:
-  Precision@5: 1.0000, Recall@5: 0.0595, NDCG@5: 0.8059, Coverage@5: 0.0595
-  Precision@10: 1.0000, Recall@10: 0.1190, NDCG@10: 0.8839, Coverage@10: 0.1190
-  MRR: 1.0000
+  Precision@5: 0.0000, Recall@5: 0.0000, NDCG@5: 0.8059
+  Precision@10: 0.0000, Recall@10: 0.0000, NDCG@10: 0.8839
+  MRR: 0.0000
 
 Retrieved Results (Top 10):
    1. [adfbd8d3-a3ca-4fc9-8088-d6d8d48a5ffe] Frango assado coxa sob coxa kg
@@ -359,33 +333,13 @@ Retrieved Results (Top 10):
       Score: 0.4959, GT Score: 3.0
 
 Ground Truth (Top 10):
-   1. [6dd2df3b-765b-41b8-b868-ddce6cb9df15] Coxa com Sobrecoxa de Frango Big Frango Bandeja Kg
-      GT Score: 4.0
-   2. [a8413974-2cd9-4345-ae45-1e960746003b] Empanado de Frango Coxinha da Asa Sadia 400g
-      GT Score: 4.0
-   3. [d7ff311e-b594-498c-9eba-eff05e31d516] Frango Desfiado Temperado Cozido Sadia 400g
-      GT Score: 4.0
-   4. [ba9d900f-df9a-4b3f-9855-58e58ec0d05b] 30 - frango da casa
-      GT Score: 3.0
-   5. [a44f6c5e-1eff-4f8b-a237-263cbc336108] Frango Xadrez Ex Grande Cbn
-      GT Score: 3.0
-   6. [c66f3e87-bc90-42e2-a640-2fe5f41ba912] Frango com polenta
-      GT Score: 3.0
-   7. [de15af8a-8b6e-4fa3-93c1-d73cd638219f] Coxinha de Frango
-      GT Score: 3.0
-   8. [6800a77e-f98a-46bb-8df6-ca8b9656a87d] Marmitex De Coração E Medalhão De Frango
-      GT Score: 3.0
-   9. [07efd818-26a6-4ebd-8b69-ec68713ee980] Pastel de frango c/ requeijão
-      GT Score: 3.0
-  10. [586085ba-7128-4534-ba29-9f037cad9173] Pastel Mexicano de frango
-      GT Score: 3.0
 
 
 Query 51: Prato de frutos do mar costeiros
 --------------------------------------------------------------------------------
 Metrics:
-  Precision@5: 1.0000, Recall@5: 0.0667, NDCG@5: 0.7364, Coverage@5: 0.0667
-  Precision@10: 1.0000, Recall@10: 0.1333, NDCG@10: 0.7052, Coverage@10: 0.1333
+  Precision@5: 0.6000, Recall@5: 0.4000, NDCG@5: 0.7364
+  Precision@10: 0.5000, Recall@10: 0.5000, NDCG@10: 0.7052
   MRR: 1.0000
 
 Retrieved Results (Top 10):
@@ -436,8 +390,8 @@ Ground Truth (Top 10):
 Query 52: Salada fresca do mercado do fazendeiro
 --------------------------------------------------------------------------------
 Metrics:
-  Precision@5: 1.0000, Recall@5: 0.0532, NDCG@5: 0.6855, Coverage@5: 0.0532
-  Precision@10: 1.0000, Recall@10: 0.1064, NDCG@10: 0.7539, Coverage@10: 0.1064
+  Precision@5: 0.8000, Recall@5: 0.2000, NDCG@5: 0.6855
+  Precision@10: 0.7000, Recall@10: 0.6000, NDCG@10: 0.7539
   MRR: 1.0000
 
 Retrieved Results (Top 10):
@@ -488,8 +442,8 @@ Ground Truth (Top 10):
 Query 69: Batata-doce assada recheada
 --------------------------------------------------------------------------------
 Metrics:
-  Precision@5: 1.0000, Recall@5: 0.0575, NDCG@5: 0.9160, Coverage@5: 0.0575
-  Precision@10: 1.0000, Recall@10: 0.1149, NDCG@10: 0.9113, Coverage@10: 0.1149
+  Precision@5: 0.8000, Recall@5: 0.8000, NDCG@5: 0.9160
+  Precision@10: 0.6000, Recall@10: 1.0000, NDCG@10: 0.9113
   MRR: 1.0000
 
 Retrieved Results (Top 10):
@@ -527,22 +481,14 @@ Ground Truth (Top 10):
       GT Score: 5.0
    6. [deeafbf7-fa94-4672-847d-5e760196337d] Batata recheada com Bacon e Cheddar+ Coca 350ml Grátis - Gra...
       GT Score: 5.0
-   7. [da28eeba-97ee-49e0-95d9-9ee5b41df1d5] Batata Recheada de Strogonoff de carne e catupiry
-      GT Score: 4.0
-   8. [8ac4728a-98de-4d7f-a3e1-b9d6f57c66d9] Batata Doce Branca
-      GT Score: 4.0
-   9. [9d2cf73a-8f3b-4604-bb66-e281a1f50e09] Batata Recheada Texas
-      GT Score: 4.0
-  10. [0b17624a-339d-4231-a9ca-e2544137f98d] Bacon com Catupiry
-      GT Score: 4.0
 
 
 Query 94: Tigela de sopa quentinha para o inverno
 --------------------------------------------------------------------------------
 Metrics:
-  Precision@5: 1.0000, Recall@5: 0.0532, NDCG@5: 0.4628, Coverage@5: 0.0532
-  Precision@10: 1.0000, Recall@10: 0.1064, NDCG@10: 0.4567, Coverage@10: 0.1064
-  MRR: 1.0000
+  Precision@5: 0.4000, Recall@5: 0.2000, NDCG@5: 0.4628
+  Precision@10: 0.3000, Recall@10: 0.3000, NDCG@10: 0.4567
+  MRR: 0.5000
 
 Retrieved Results (Top 10):
    1. [d2ff747e-5178-419e-9698-437eaef31ce5] Bife acebolado em tiras
@@ -592,8 +538,8 @@ Ground Truth (Top 10):
 Query 99: Carne assada caseira com acompanhamentos
 --------------------------------------------------------------------------------
 Metrics:
-  Precision@5: 1.0000, Recall@5: 0.0543, NDCG@5: 0.5475, Coverage@5: 0.0543
-  Precision@10: 1.0000, Recall@10: 0.1087, NDCG@10: 0.5887, Coverage@10: 0.1087
+  Precision@5: 0.4000, Recall@5: 0.0000, NDCG@5: 0.5475
+  Precision@10: 0.4000, Recall@10: 0.2000, NDCG@10: 0.5887
   MRR: 1.0000
 
 Retrieved Results (Top 10):
@@ -644,8 +590,8 @@ Ground Truth (Top 10):
 Query 60: Massa italiana rústica
 --------------------------------------------------------------------------------
 Metrics:
-  Precision@5: 1.0000, Recall@5: 0.0575, NDCG@5: 0.7195, Coverage@5: 0.0575
-  Precision@10: 1.0000, Recall@10: 0.1149, NDCG@10: 0.7226, Coverage@10: 0.1149
+  Precision@5: 1.0000, Recall@5: 0.0000, NDCG@5: 0.7195
+  Precision@10: 0.9000, Recall@10: 0.0000, NDCG@10: 0.7226
   MRR: 1.0000
 
 Retrieved Results (Top 10):
@@ -696,9 +642,9 @@ Ground Truth (Top 10):
 Query 54: Ensopado reconfortante cozido lentamente
 --------------------------------------------------------------------------------
 Metrics:
-  Precision@5: 1.0000, Recall@5: 0.0694, NDCG@5: 0.5193, Coverage@5: 0.0694
-  Precision@10: 1.0000, Recall@10: 0.1389, NDCG@10: 0.5034, Coverage@10: 0.1389
-  MRR: 1.0000
+  Precision@5: 0.4000, Recall@5: 0.2000, NDCG@5: 0.5193
+  Precision@10: 0.2000, Recall@10: 0.2222, NDCG@10: 0.5034
+  MRR: 0.3333
 
 Retrieved Results (Top 10):
    1. [9fb347fa-6013-4202-bc3a-01dc6962b2da] Empanado Feito com Peito de Frango e Recheado com Presunto L...
@@ -741,15 +687,13 @@ Ground Truth (Top 10):
       GT Score: 5.0
    9. [175a6801-52c3-4f92-8b7b-b027e0c9040b] Frango Cozido E Desfiado Aurora 360g
       GT Score: 5.0
-  10. [b27dbd89-67e0-44ea-a44f-998cff564e4b] Frango a passarinho
-      GT Score: 4.0
 
 
 Query 42: Elementos de pizza napolitana
 --------------------------------------------------------------------------------
 Metrics:
-  Precision@5: 1.0000, Recall@5: 0.0667, NDCG@5: 0.5586, Coverage@5: 0.0667
-  Precision@10: 1.0000, Recall@10: 0.1333, NDCG@10: 0.6634, Coverage@10: 0.1333
+  Precision@5: 0.6000, Recall@5: 0.2000, NDCG@5: 0.5586
+  Precision@10: 0.5000, Recall@10: 0.4000, NDCG@10: 0.6634
   MRR: 1.0000
 
 Retrieved Results (Top 10):
@@ -800,9 +744,9 @@ Ground Truth (Top 10):
 Query 30: Tigela de proteína vegetariana
 --------------------------------------------------------------------------------
 Metrics:
-  Precision@5: 0.4000, Recall@5: 0.0294, NDCG@5: 0.0372, Coverage@5: 0.0294
-  Precision@10: 0.6000, Recall@10: 0.0882, NDCG@10: 0.1573, Coverage@10: 0.0882
-  MRR: 0.2500
+  Precision@5: 0.0000, Recall@5: 0.0000, NDCG@5: 0.0372
+  Precision@10: 0.1000, Recall@10: 0.1111, NDCG@10: 0.1573
+  MRR: 0.1667
 
 Retrieved Results (Top 10):
    1. [6c4211d7-d73e-48ed-acc9-89e7920fe7fc] Tilápia Congelada Copacol Filé Pacote 400g
@@ -845,16 +789,14 @@ Ground Truth (Top 10):
       GT Score: 5.0
    9. [50325246-c1c9-44e8-96b2-d1ab126fe82d] Barra trufada | pistache
       GT Score: 5.0
-  10. [7676d569-620d-4f56-bcfb-5777992f72a3] Cogumelos
-      GT Score: 4.0
 
 
 Query 4: Almoço estilo havaiano
 --------------------------------------------------------------------------------
 Metrics:
-  Precision@5: 1.0000, Recall@5: 0.0694, NDCG@5: 0.4431, Coverage@5: 0.0694
-  Precision@10: 1.0000, Recall@10: 0.1389, NDCG@10: 0.4991, Coverage@10: 0.1389
-  MRR: 1.0000
+  Precision@5: 0.0000, Recall@5: 0.0000, NDCG@5: 0.4431
+  Precision@10: 0.0000, Recall@10: 0.0000, NDCG@10: 0.4991
+  MRR: 0.0000
 
 Retrieved Results (Top 10):
    1. [fac4ae17-0ecb-4981-ae58-70a671d05fa3] Executivo picanha grelhada.
@@ -883,30 +825,14 @@ Ground Truth (Top 10):
       GT Score: 5.0
    2. [cf0d7d41-0653-419f-9518-e774ea079b45] Executivo Sobrecoxa Desossada Grelhada
       GT Score: 5.0
-   3. [3456d94e-aca7-41c4-b77d-64a0067c166c] Marmita Frango H2
-      GT Score: 4.0
-   4. [ebad5da7-439e-47f2-ae56-f583677147ef] Sanduba Frango Caprese Caesar
-      GT Score: 4.0
-   5. [f4050bf2-0b1e-4cde-af19-8aedb2ce8b7b] Executivo tilápia grelhada
-      GT Score: 4.0
-   6. [581059a8-1efb-4669-8033-45de8ea76091] Refrigerante 2lts
-      GT Score: 3.0
-   7. [970acd9e-719f-4b62-9d1a-3b6a2d630300] Parmegiana de frango - P
-      GT Score: 3.0
-   8. [b536d3ab-57fb-4b04-bd36-e4418ab388e7] Super Peixe Escabeche
-      GT Score: 3.0
-   9. [6d8cd22c-5e98-4183-b0e9-1ec2b5ada77b] Maminha à moda da casa - a la carte
-      GT Score: 3.0
-  10. [f16e13ea-be83-4dd1-94d5-5e89c552b210] Marmita P - Contra file + Batata frita (Ô Irresistível)
-      GT Score: 3.0
 
 
 Query 34: comida de rua libanesa
 --------------------------------------------------------------------------------
 Metrics:
-  Precision@5: 1.0000, Recall@5: 0.0510, NDCG@5: 0.6130, Coverage@5: 0.0510
-  Precision@10: 1.0000, Recall@10: 0.1020, NDCG@10: 0.6531, Coverage@10: 0.1020
-  MRR: 1.0000
+  Precision@5: 0.4000, Recall@5: 0.5000, NDCG@5: 0.6130
+  Precision@10: 0.3000, Recall@10: 0.7500, NDCG@10: 0.6531
+  MRR: 0.5000
 
 Retrieved Results (Top 10):
    1. [f730c1d5-50d3-4542-a59f-25bf2fb7cf32] Lombo Mineiro 1p
@@ -939,25 +865,13 @@ Ground Truth (Top 10):
       GT Score: 5.0
    4. [14b2749a-8fd8-481e-8a3a-2ec1c9e0e20a] Kibe cru 150g Hortelã e cebola . Não campanha pão sírio.
       GT Score: 5.0
-   5. [5d85ee83-a364-4424-9198-d366aa643f99] Combo de Esfihas Nº01 (10 Esfiha de Carne + 10 Esf de Queijo...
-      GT Score: 4.0
-   6. [a908f81e-4369-485f-8de3-338c504b778a] Molho Lebanese honey mustard 30ml
-      GT Score: 4.0
-   7. [d24b96aa-bba0-488e-9c7d-401de94b3b73] 100 - Árabe
-      GT Score: 4.0
-   8. [2fadcdcc-448a-4b82-8ed7-be893b20ba31] Falafel egípcio com mistura egípcia
-      GT Score: 4.0
-   9. [d0e87147-3327-42dd-a087-b166ed595243] Segunda sem Carne - Wrap Falafel & Homus
-      GT Score: 4.0
-  10. [7904696d-2645-415e-a025-5246345ec0ad] Promo da Quarta - Burrito Classic
-      GT Score: 3.0
 
 
 Query 35: tigela de curry japonesa
 --------------------------------------------------------------------------------
 Metrics:
-  Precision@5: 1.0000, Recall@5: 0.0556, NDCG@5: 0.8026, Coverage@5: 0.0556
-  Precision@10: 1.0000, Recall@10: 0.1111, NDCG@10: 0.7000, Coverage@10: 0.1111
+  Precision@5: 0.2000, Recall@5: 1.0000, NDCG@5: 0.8026
+  Precision@10: 0.1000, Recall@10: 1.0000, NDCG@10: 0.7000
   MRR: 1.0000
 
 Retrieved Results (Top 10):
@@ -985,32 +899,14 @@ Retrieved Results (Top 10):
 Ground Truth (Top 10):
    1. [f59f0246-ebd0-4f57-9998-543ca470200c] Curry de grão de bico
       GT Score: 5.0
-   2. [6654271f-9885-4400-a0ff-6d708fc269c2] 42 unidades hot holl de salmão grelhado
-      GT Score: 4.0
-   3. [54688b98-dfe4-42c3-9b64-25db9eae8a0e] Poke Tropical
-      GT Score: 3.0
-   4. [1ed05921-c269-4f3d-a46e-5cbe1d1c75a4] Festival Kaizen Sushi Premium - Para 2 pessoas
-      GT Score: 3.0
-   5. [f2dcec9b-4149-4220-bf10-00c8b0a04c06] Combo Toru 50 peças
-      GT Score: 3.0
-   6. [8f35be3b-d3fd-43f0-9988-29f55ccde9d6] 1 Temaki + 10 Hot Rolls
-      GT Score: 3.0
-   7. [e5702dc0-2000-4257-8730-8a9308798811] Temaki Shimeji
-      GT Score: 3.0
-   8. [a2d3e2a5-3dff-4849-8322-6eec8786f9d4] Kit Quente 1 Pessoa 18 Pçs
-      GT Score: 3.0
-   9. [7676d569-620d-4f56-bcfb-5777992f72a3] Cogumelos
-      GT Score: 3.0
-  10. [9cc4f61f-f543-4e7b-9f30-2cb00c085e1b] Joy Salmão Crispy Couve
-      GT Score: 3.0
 
 
 Query 96: Arroz temperado do norte da África
 --------------------------------------------------------------------------------
 Metrics:
-  Precision@5: 1.0000, Recall@5: 0.0515, NDCG@5: 0.7708, Coverage@5: 0.0515
-  Precision@10: 1.0000, Recall@10: 0.1031, NDCG@10: 0.7944, Coverage@10: 0.1031
-  MRR: 1.0000
+  Precision@5: 0.0000, Recall@5: 0.0000, NDCG@5: 0.7708
+  Precision@10: 0.0000, Recall@10: 0.0000, NDCG@10: 0.7944
+  MRR: 0.0000
 
 Retrieved Results (Top 10):
    1. [e01bc5c5-41b1-42f5-bd6c-67a1a277698e] Arroz Tipo 1 Tio João 2kg
@@ -1037,32 +933,14 @@ Retrieved Results (Top 10):
 Ground Truth (Top 10):
    1. [dc1ea271-599f-495a-a011-2ca79cfcf3d2] Arroz com Cordeiro no Vinho (400g)
       GT Score: 5.0
-   2. [10892c0e-0402-4c97-8e4e-7f1f96dc6893] Filé de Frango Grelhado (P) + Saladinha
-      GT Score: 4.0
-   3. [dba05d85-d9d4-48fb-bba4-2c44de1dac48] Marmita - Prato Feito Filé De Frango Grelhado Temperado (Ser...
-      GT Score: 3.0
-   4. [96ac5b40-61dc-4c0d-8d0c-c407ea047b27] Marmita P Tilápia grelhada c/ Mix de Legumes
-      GT Score: 3.0
-   5. [70ee6e32-38ef-4188-9dc0-fb2b53bfa702] Marmita M Strogonoff
-      GT Score: 3.0
-   6. [c04a7f16-32c1-401c-a5b5-77edc9fa2a74] Marmitex Contra filé Grelhado
-      GT Score: 3.0
-   7. [075e1891-c3d4-4829-bc4d-27434beef6c4] Combo 3
-      GT Score: 3.0
-   8. [3b16067e-e0a6-4e6e-ab20-c5c56eeb1c83] Filé de Frango Grelhado
-      GT Score: 3.0
-   9. [cf0d7d41-0653-419f-9518-e774ea079b45] Executivo Sobrecoxa Desossada Grelhada
-      GT Score: 3.0
-  10. [bfa32b03-d273-4c6e-ad13-38145646ad7d] Linguiça calabresa acebolada
-      GT Score: 3.0
 
 
 Query 86: Clássico de bistrô francês
 --------------------------------------------------------------------------------
 Metrics:
-  Precision@5: 1.0000, Recall@5: 0.0556, NDCG@5: 0.4867, Coverage@5: 0.0556
-  Precision@10: 1.0000, Recall@10: 0.1111, NDCG@10: 0.4745, Coverage@10: 0.1111
-  MRR: 1.0000
+  Precision@5: 0.2000, Recall@5: 0.5000, NDCG@5: 0.4867
+  Precision@10: 0.1000, Recall@10: 0.5000, NDCG@10: 0.4745
+  MRR: 0.3333
 
 Retrieved Results (Top 10):
    1. [3a24caf1-58ef-4401-8e73-324464cf8141] Frango c/ Catupiry
@@ -1091,29 +969,13 @@ Ground Truth (Top 10):
       GT Score: 6.0
    2. [8df11455-efc9-4775-9a3b-bafd57410fa3] Medalhão De Mignon
       GT Score: 6.0
-   3. [ffa406a1-2cc4-43be-af7b-5ebc85ed1ad9] Café em Grão Coffee ++ Clássico 250g
-      GT Score: 4.0
-   4. [6f5aa297-57d4-434f-a7c5-cc5ad6567030] Pudim Gourmet
-      GT Score: 4.0
-   5. [e790096e-b8f8-4477-9400-a6628e04ce15] Strogonoff de Filé Mignon P/ 2 Pessoas + Acompanhamentos a e...
-      GT Score: 4.0
-   6. [20ba3de5-2d2d-483a-aa4e-4cd90ca953d6] Filé Caipirão
-      GT Score: 4.0
-   7. [76f76ad7-2f11-4e11-9d42-cd780f3a4f12] Filé Mignon a milanesa, molho branco 2 queijos, ervilha fres...
-      GT Score: 4.0
-   8. [683fe2a1-05b1-450f-909d-2f3b2ffb00ed] 2304 -Filé à Vilalva
-      GT Score: 4.0
-   9. [366c3e43-6855-4716-90ff-af2d67a5d97a] Pão Francês  380
-      GT Score: 3.0
-  10. [5880974b-eee3-4551-a1df-d17397aed040] Pão Francês (6 unidades)
-      GT Score: 3.0
 
 
 Query 100: Lanche reconfortante para a madrugada
 --------------------------------------------------------------------------------
 Metrics:
-  Precision@5: 1.0000, Recall@5: 0.0568, NDCG@5: 0.8638, Coverage@5: 0.0568
-  Precision@10: 1.0000, Recall@10: 0.1136, NDCG@10: 0.8673, Coverage@10: 0.1136
+  Precision@5: 1.0000, Recall@5: 0.0000, NDCG@5: 0.8638
+  Precision@10: 1.0000, Recall@10: 0.2000, NDCG@10: 0.8673
   MRR: 1.0000
 
 Retrieved Results (Top 10):
@@ -1164,8 +1026,8 @@ Ground Truth (Top 10):
 Query 97: Prato para almoço de escritório
 --------------------------------------------------------------------------------
 Metrics:
-  Precision@5: 1.0000, Recall@5: 0.0568, NDCG@5: 0.9385, Coverage@5: 0.0568
-  Precision@10: 1.0000, Recall@10: 0.1136, NDCG@10: 0.9440, Coverage@10: 0.1136
+  Precision@5: 1.0000, Recall@5: 0.0000, NDCG@5: 0.9385
+  Precision@10: 1.0000, Recall@10: 0.1000, NDCG@10: 0.9440
   MRR: 1.0000
 
 Retrieved Results (Top 10):
@@ -1216,9 +1078,9 @@ Ground Truth (Top 10):
 Query 92: Comida de rua do mercado noturno
 --------------------------------------------------------------------------------
 Metrics:
-  Precision@5: 1.0000, Recall@5: 0.0562, NDCG@5: 0.4708, Coverage@5: 0.0562
-  Precision@10: 0.9000, Recall@10: 0.1011, NDCG@10: 0.4904, Coverage@10: 0.1011
-  MRR: 1.0000
+  Precision@5: 0.0000, Recall@5: 0.0000, NDCG@5: 0.4708
+  Precision@10: 0.2000, Recall@10: 0.1000, NDCG@10: 0.4904
+  MRR: 0.1667
 
 Retrieved Results (Top 10):
    1. [528e4025-548c-4060-ac39-0facefd9256c] Bife a milanesa (M)marmita
@@ -1268,8 +1130,8 @@ Ground Truth (Top 10):
 Query 82: Combo de lanches para noite de cinema
 --------------------------------------------------------------------------------
 Metrics:
-  Precision@5: 1.0000, Recall@5: 0.0575, NDCG@5: 0.7988, Coverage@5: 0.0575
-  Precision@10: 1.0000, Recall@10: 0.1149, NDCG@10: 0.8371, Coverage@10: 0.1149
+  Precision@5: 0.8000, Recall@5: 0.4000, NDCG@5: 0.7988
+  Precision@10: 0.9000, Recall@10: 0.3000, NDCG@10: 0.8371
   MRR: 1.0000
 
 Retrieved Results (Top 10):
@@ -1320,8 +1182,8 @@ Ground Truth (Top 10):
 Query 78: Refeição proteica pós-treino
 --------------------------------------------------------------------------------
 Metrics:
-  Precision@5: 1.0000, Recall@5: 0.0549, NDCG@5: 0.7758, Coverage@5: 0.0549
-  Precision@10: 1.0000, Recall@10: 0.1099, NDCG@10: 0.8305, Coverage@10: 0.1099
+  Precision@5: 0.8000, Recall@5: 0.4000, NDCG@5: 0.7758
+  Precision@10: 0.9000, Recall@10: 0.4000, NDCG@10: 0.8305
   MRR: 1.0000
 
 Retrieved Results (Top 10):
@@ -1372,9 +1234,9 @@ Ground Truth (Top 10):
 Query 73: Comidas favoritas do estádio
 --------------------------------------------------------------------------------
 Metrics:
-  Precision@5: 1.0000, Recall@5: 0.0526, NDCG@5: 0.5380, Coverage@5: 0.0526
-  Precision@10: 1.0000, Recall@10: 0.1053, NDCG@10: 0.6096, Coverage@10: 0.1053
-  MRR: 1.0000
+  Precision@5: 0.4000, Recall@5: 0.0000, NDCG@5: 0.5380
+  Precision@10: 0.6000, Recall@10: 0.1000, NDCG@10: 0.6096
+  MRR: 0.3333
 
 Retrieved Results (Top 10):
    1. [fe595fb2-a32d-479a-924b-30604dcdc194] Costela Geléião + porção individual + refri lata
@@ -1424,8 +1286,8 @@ Ground Truth (Top 10):
 Query 71: Jantar familiar caseiro
 --------------------------------------------------------------------------------
 Metrics:
-  Precision@5: 1.0000, Recall@5: 0.0521, NDCG@5: 0.7601, Coverage@5: 0.0521
-  Precision@10: 1.0000, Recall@10: 0.1042, NDCG@10: 0.7345, Coverage@10: 0.1042
+  Precision@5: 0.8000, Recall@5: 0.0000, NDCG@5: 0.7601
+  Precision@10: 0.6000, Recall@10: 0.1000, NDCG@10: 0.7345
   MRR: 1.0000
 
 Retrieved Results (Top 10):
@@ -1476,8 +1338,8 @@ Ground Truth (Top 10):
 Query 66: Café da manhã rápido com bolos
 --------------------------------------------------------------------------------
 Metrics:
-  Precision@5: 1.0000, Recall@5: 0.0633, NDCG@5: 0.8866, Coverage@5: 0.0633
-  Precision@10: 1.0000, Recall@10: 0.1266, NDCG@10: 0.9109, Coverage@10: 0.1266
+  Precision@5: 1.0000, Recall@5: 0.2000, NDCG@5: 0.8866
+  Precision@10: 1.0000, Recall@10: 0.4000, NDCG@10: 0.9109
   MRR: 1.0000
 
 Retrieved Results (Top 10):
@@ -1528,8 +1390,8 @@ Ground Truth (Top 10):
 Query 39: Café da manhã clássico
 --------------------------------------------------------------------------------
 Metrics:
-  Precision@5: 1.0000, Recall@5: 0.0769, NDCG@5: 0.8691, Coverage@5: 0.0769
-  Precision@10: 1.0000, Recall@10: 0.1538, NDCG@10: 0.8721, Coverage@10: 0.1538
+  Precision@5: 1.0000, Recall@5: 0.0000, NDCG@5: 0.8691
+  Precision@10: 1.0000, Recall@10: 0.3000, NDCG@10: 0.8721
   MRR: 1.0000
 
 Retrieved Results (Top 10):
@@ -1580,9 +1442,9 @@ Ground Truth (Top 10):
 Query 9: Lancheira estilo bento
 --------------------------------------------------------------------------------
 Metrics:
-  Precision@5: 1.0000, Recall@5: 0.0909, NDCG@5: 0.3313, Coverage@5: 0.0909
-  Precision@10: 1.0000, Recall@10: 0.1818, NDCG@10: 0.4098, Coverage@10: 0.1818
-  MRR: 1.0000
+  Precision@5: 0.2000, Recall@5: 0.3333, NDCG@5: 0.3313
+  Precision@10: 0.1000, Recall@10: 0.3333, NDCG@10: 0.4098
+  MRR: 0.2000
 
 Retrieved Results (Top 10):
    1. [6610fdd9-0aaa-4fd4-bbc4-499724cb8b99] Peninha
@@ -1613,18 +1475,4 @@ Ground Truth (Top 10):
       GT Score: 6.0
    3. [002f4fdb-2e83-45d4-9bf8-a2e580d0a6b1] Caixa com 1 Bento Cake + 16 brigadeiros sortidos
       GT Score: 5.0
-   4. [8531137e-51be-405a-a90b-4457a7858bef] Bento Shimeji
-      GT Score: 3.0
-   5. [c8947b74-a3a6-4146-9b82-ac4c493eceb3] Copo da Felicidade Morango com Ninho e Nutella 300ml
-      GT Score: 3.0
-   6. [ed29c625-ffe9-45dc-95d6-fa8976f5a0bc] Marmita de filé de frango
-      GT Score: 3.0
-   7. [76d314e2-0240-4b66-ad80-3eb83158296c] Lanche dona lurdes
-      GT Score: 3.0
-   8. [252373d9-89b4-485a-8dda-d790216ded09] Promoção da casa
-      GT Score: 3.0
-   9. [fe9beebd-cee2-4fb0-a81e-a54b07a39c2b] Salad Egg
-      GT Score: 3.0
-  10. [3aeb7744-c99d-43dc-883f-4eec44d7d85b] Lanche Natural Caprese
-      GT Score: 3.0
 

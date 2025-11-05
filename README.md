@@ -1,6 +1,4 @@
-# Food Semantic Search
-Design and implement a semantic search system that matches natural language (Portuguese)
-food queries to the most relevant food items in dataset.
+
 
 ## Architecture Design
 
@@ -60,36 +58,105 @@ Scoring completed!
    Tried human labeling →  
    Too much data to handle manually and time-consuming.
 
-## Experiments
+## Components and Experiments
 
 Detailed evaluation reports are available in `artifacts/eval_runs`.  
 If you want to run the experiments yourself, execute the scripts under `scripts/evaluation`, but make sure to complete the prerequisites first and verify the parameter settings in each script’s `main` function.
 
+### Experiment Environment
+
+```
+Hardware Configuration:
+  Platform: macOS-15.6.1-arm64-arm-64bit-Mach-O
+  Processor: arm
+  Machine: arm64
+  Architecture: 64bit
+  CPU Count: 8
+  CPU Frequency: 3504.00 MHz
+  Total Memory: 16.00 GB
+  GPU: Apple Metal (MPS)
+  GPU Memory: N/A
+  Python Version: 3.13.2
+```
+
+
 ### Text Retriever (BM25)
 
 | Average (ms) | Max (ms) | Min (ms) |
-|:-------------:|:--------:|:--------:|
-| 2.69 | 4.21 | 1.73 |
+|:------------:|:--------:|:--------:|
+|     2.75     |   4.44   |   1.79   |
 
-| Metric | Precision | Recall | NDCG | Coverage |
-|:--------|:----------:|:-------:|:------:|:----------:|
-| **@K=5**  | 0.9667 | 0.0589 | 0.5920 | 0.0572 |
-| **@K=10** | 0.9633 | 0.1177 | 0.6225 | 0.1160 |
+| Metric | Precision | Recall | NDCG |
+|:--|--:|--:|--:|
+| **@K = 5** | 0.3933 | 0.2111 | 0.5920 |
+| **@K = 10** | 0.3900 | 0.2850 | 0.6225 |
 
 ### Vector Retriever
 
 
 | Model name                                                      | Average (ms) | Max (ms) | Min (ms) |
-|-----------------------------------------------------------------|:-------------:|:--------:|:--------:|
-| **BAAI/bge-m3**                                                 | 46.95 | 89.88 | 33.89 |
-| **sentence-transformers/paraphrase-multilingual-MiniLM-L12-v2** | 109.62 | 510.61 | 7.45 |
+|-----------------------------------------------------------------|:------------:|:--------:|:--------:|
+| **BAAI/bge-m3**                                                 |    59.25     |  284.47   |  33.55  |
+| **sentence-transformers/paraphrase-multilingual-MiniLM-L12-v2** |    22.67     |  149.13  |   8.42   |
 
-| Model name | Metric | Precision | Recall | NDCG | Coverage |
-|------------|:--------|:----------:|:-------:|:------:|:----------:|
-|      **BAAI/bge-m3**          | **@K=5**  | 0.9800 | 0.0598 | 0.6697 | 0.0580 |
-|      **BAAI/bge-m3**          | **@K=10** | 0.9833 | 0.1202 | 0.6963 | 0.1184 |
-|       **sentence-transformers/paraphrase-multilingual-MiniLM-L12-v2**                        | **@K=5**  | 0.4667 | 0.0286 | 0.3351 | 0.0268 |
-|       **sentence-transformers/paraphrase-multilingual-MiniLM-L12-v2**                        | **@K=10** | 0.3867 | 0.0478 | 0.3125 | 0.0461 |
+| Model name | Metric | Precision | Recall | NDCG | 
+|------------|:--------|:---------:|:------:|:------:|
+|      **BAAI/bge-m3**          | **@K=5**  |  0.5067   | 0.2244 | 0.6697 | 
+|      **BAAI/bge-m3**          | **@K=10** |  0.4700   | 0.3112 | 0.6963 | 
+|       **sentence-transformers/paraphrase-multilingual-MiniLM-L12-v2**                        | **@K=5**  |  0.2267   | 0.1517 | 0.3351 |
+|       **sentence-transformers/paraphrase-multilingual-MiniLM-L12-v2**                        | **@K=10** |  0.1933   | 0.1774 | 0.3125 | 
 
 I also tried both text-embedding-3-small and text-embedding-3-large, but embedding through the API takes around 1 second per query, which is too slow. It also depends on the network speed and OpenAI’s service performance, and the token usage is billed, making it quite expensive for large-scale datasets and high concurrency queries.
+
+### Hybrid Retriever
+
+Concurrent text retriever + vector retriever (top-50 + top-50) → RRF fusion (top-20) → filtering → reranker → top-10
+
+
+
+| Metric | Average (ms) | Max (ms) | Min (ms) |
+|:--|--:|--:|--:|
+| **Overall Latency** | 1851.93 | 4071.48 | 1124.13 |
+
+
+| Stage | Avg (ms) | Max (ms) | Min (ms) | Notes |
+|:--|--:|--:|--:|:--|
+| **BM25 Retrieval** | 16.80 | 162.80 | 7.32 | Text-based retrieval |
+| **Vector Retrieval** | 82.39 | 357.26 | 42.31 | HNSW + Embedding Search |
+| **RRF Fusion / Merge** | 0.16 | 0.27 | 0.09 | Reciprocal Rank Fusion |
+| **Cross-Encoder Re-ranking** | 1767.78 | 4013.13 | 761.19 | Re-ranking with BGE Reranker |
+
+
+| Metric | Precision | Recall | NDCG |
+|:--|--:|--:|--:|
+| **@K = 5** | 0.5733 | 0.2494 | 0.7141 |
+| **@K = 10** | 0.5033 | 0.3726 | 0.7321 |
+
+### Evaluation and Reflection
+
+
+| Metric | Your Result | Typical Range (Ref: MS MARCO / BEIR / MTEB) | Evaluation |
+|:--|:--:|:--:|:--:|
+| **NDCG@10** | 0.73 | 0.60–0.80 | ⭐ Good |
+| **Precision@10** | 0.50 | 0.40–0.60 | ⭐ Good |
+| **Recall@10** | 0.37 | 0.30–0.50 | ⚖️ Moderate |
+| **Latency** | 1.85s | <1s Ideal | 🐢 Slow |
+
+| Reference                         | Link                                                                                                 |
+|-----------------------------------|------------------------------------------------------------------------------------------------------|
+| MS MARCO Leaderboard              | [https://microsoft.github.io/msmarco/leaderboard/](https://microsoft.github.io/msmarco/leaderboard/) |
+| BEIR Leaderboard                  | [https://github.com/beir-cellar/beir#leaderboard](https://github.com/beir-cellar/beir#leaderboard)   |
+| HuggingFace Retrieval Leaderboard | [https://huggingface.co/spaces/mteb/leaderboard](https://huggingface.co/spaces/mteb/leaderboard)     |
+
+
+The overall latency (≈1.85s) is relatively high compared to the ideal target (<1s).
+
+1. **Limited GPU parallelism on macOS (MPS)**  
+   Apple’s Metal Performance Shader (MPS) backend currently does not support true parallel inference or concurrent batching. 
+   As a result, multiple batches of Cross-Encoder re-ranking are executed sequentially rather than concurrently, leading to longer total inference time.
+2. **Lack of GPU acceleration (no CUDA available)**  
+   The experiments were run on a **MacBook Air (M2, 16GB)**.  
+   Without CUDA or discrete GPU, computation relies mainly on CPU and limited MPS acceleration, resulting in higher latency.
+
+
 
