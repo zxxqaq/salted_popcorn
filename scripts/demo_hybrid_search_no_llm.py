@@ -125,7 +125,22 @@ def main():
         print("     (Will try to read from environment variables)")
     
     print("\nLoading candidates...")
-    candidates = load_food_candidates_for_hybrid(items_path)
+    
+    # BM25 caching parameters (read before loading candidates)
+    bm25_cache_dir_str = os.getenv("BM25_CACHE_DIR")
+    bm25_cache_dir = None
+    if bm25_cache_dir_str and bm25_cache_dir_str.strip():
+        bm25_cache_dir = REPO_ROOT / bm25_cache_dir_str.strip()
+    
+    bm25_cache_enabled_str = os.getenv("BM25_CACHE_ENABLED", "True").strip().lower()
+    bm25_cache_enabled = bm25_cache_enabled_str in ("true", "1", "yes")
+    
+    # Load candidates with caching support
+    candidates, data_source_hash = load_food_candidates_for_hybrid(
+        items_path,
+        cache_dir=bm25_cache_dir,
+        cache_enabled=bm25_cache_enabled,
+    )
     print(f"  ✓ Loaded {len(candidates)} items")
     
     # Get all required parameters from environment variables
@@ -481,6 +496,10 @@ def main():
         reranker_top_k=reranker_top_k,
         # Query embedding parameters (optional)
         vector_query_embedding_model=vector_query_embedding_model,
+        # BM25 caching parameters (optional)
+        bm25_cache_dir=bm25_cache_dir,
+        bm25_cache_enabled=bm25_cache_enabled,
+        bm25_data_source_hash=data_source_hash,
     )
     print("  ✓ Hybrid retriever initialized")
     

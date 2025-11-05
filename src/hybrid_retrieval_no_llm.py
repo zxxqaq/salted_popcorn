@@ -116,6 +116,10 @@ class HybridRetriever:
         reranker_top_k: int | None = None,  # Top-K items to return from reranker (None = return all scored items)
         # Query embedding parameters (optional, must come after all required parameters)
         vector_query_embedding_model: str | None = None,  # Optional: Local SentenceTransformer model for query embeddings
+        # BM25 caching parameters (optional, must come after all required parameters)
+        bm25_cache_dir: Path | str | None = None,
+        bm25_cache_enabled: bool = True,
+        bm25_data_source_hash: str | None = None,
     ) -> None:
         """
         Initialize hybrid retriever.
@@ -182,6 +186,9 @@ class HybridRetriever:
             candidates,
             k1=bm25_k1,
             b=bm25_b,
+            cache_dir=bm25_cache_dir,
+            cache_enabled=bm25_cache_enabled,
+            data_source_hash=bm25_data_source_hash,
         )
         
         # Initialize Vector retriever with all required parameters
@@ -553,7 +560,11 @@ class HybridRetriever:
         )
 
 
-def load_food_candidates_for_hybrid(csv_path: Path) -> List[Candidates]:
-    """Load candidates for hybrid retrieval."""
+def load_food_candidates_for_hybrid(
+    csv_path: Path,
+    cache_dir: Path | str | None = None,
+    cache_enabled: bool = True,
+) -> tuple[List[Candidates], str]:
+    """Load candidates for hybrid retrieval with caching support."""
     from src.bm25_retrieval import load_food_candidates
-    return load_food_candidates(csv_path)
+    return load_food_candidates(csv_path, cache_dir=cache_dir, cache_enabled=cache_enabled)
