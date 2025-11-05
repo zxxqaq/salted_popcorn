@@ -37,6 +37,8 @@ Put here to specify in case you want to regenerate cache files. Make sure check 
    python scripts/generate/generate_vector_index.py
    python scripts/generate/generate_reranker_tokenization_cache.py
    exit
+   
+   # you can also check scripts/evaluation to run evaluation test
    ```
 **Run demo**
    
