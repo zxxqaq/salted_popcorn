@@ -12,8 +12,9 @@ A semantic search system that matches natural language food queries to the most 
 
    ```bash
    git clone <repository-url>
+   # and then cd into the dir
    
-    cp .env.example .env
+   cp .env.example .env
    # Edit .env file with your configuration
    
    docker-compose build
