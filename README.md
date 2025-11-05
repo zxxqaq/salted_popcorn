@@ -2,7 +2,56 @@
 ## Intro
 A semantic search system that matches natural language food queries to the most relevant food items in our dataset.
 
-## Quick-start
+## Quick-start 🚀
+
+### Prerequisites
+
+- **Docker** and **Docker Compose** installed
+
+### Docker Deployment 
+
+   ```bash
+   git clone <repository-url>
+   
+    cp .env.example .env
+   # Edit .env file with your configuration
+   
+   docker-compose build
+   # Build Docker image (installs dependencies and downloads models)
+   ```
+
+**Generate cache files (no need, already in data folder)**
+
+Put here to specify in case you want to regenerate cache files. Make sure check .env parameters and parameters in main before generation.
+   
+   ```bash
+   # Option 1: Run each script individually
+   docker-compose run --rm semantic-search python scripts/generate/generate_bm25_cache.py
+   docker-compose run --rm semantic-search python scripts/generate/generate_vector_index.py
+   docker-compose run --rm semantic-search python scripts/generate/generate_reranker_tokenization_cache.py
+   
+   # Option 2: Enter container and run scripts interactively
+   docker-compose run --rm semantic-search bash
+   # Inside container:
+   python scripts/generate/generate_bm25_cache.py
+   python scripts/generate/generate_vector_index.py
+   python scripts/generate/generate_reranker_tokenization_cache.py
+   exit
+   ```
+**Run demo**
+   
+   ```bash
+   # Option 1: One-liner (recommended)
+   docker-compose run --rm semantic-search python scripts/demo_query_selector.py 5
+   
+   # Option 2: Interactive mode
+   docker-compose run --rm semantic-search bash
+   # Inside container:
+   python scripts/demo_query_selector.py 5
+   # Or run without arguments for interactive query selection:
+   python scripts/demo_query_selector.py
+   exit
+   ```
 
 
 ## Demo

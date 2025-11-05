@@ -40,9 +40,9 @@ def main():
     if cache_dir_str and cache_dir_str.strip():
         cache_dir = REPO_ROOT / cache_dir_str.strip()
     else:
-        cache_dir = REPO_ROOT / "artifacts" / "reranker_tokenization_cache"
+        cache_dir = REPO_ROOT / "data" / "reranker_tokenization_cache"
 
-    reranker_model = os.getenv("RERANKER_MODEL", "BAAI/bge-reranker-base").strip()
+    reranker_model = os.getenv("RERANKER_MODEL", "BAAI/RERANKER_MODEL=BAAI/bge-reranker-v2-m3").strip()
     reranker_device = os.getenv("RERANKER_DEVICE", "mps").strip() or None
 
     if not items_path.exists():

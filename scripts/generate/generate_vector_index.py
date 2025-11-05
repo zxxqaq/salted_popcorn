@@ -67,7 +67,7 @@ def main():
     index_path_str = "data/vector_indices_5k"
     if not index_path_str or not index_path_str.strip():
         # Default: use data/vector_indices directory, auto-generate filename
-        index_path = project_root / "data" / "vector_indices"
+        index_path = project_root / "data" / "vector_indices_5k"
     else:
         index_path = project_root / index_path_str.strip()
         # If it's a file path, use it as-is
