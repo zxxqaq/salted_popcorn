@@ -122,66 +122,32 @@ TIMING BREAKDOWN
 
 3. **Candidate Pool Generation**  
    For each query, perform both **vector retrieval** and **text (BM25) retrieval**, each returning **top-50** results.  
-   After deduplication, all retrieved items form the **candidate pool**,  
-   with a maximum size of `30 × 100 = 3000` pairs.
+   After deduplication, all retrieved items form the **candidate pool**, with a maximum size of `30 × 100 = 3000` pairs.
 
-4. **Ground Truth Scoring**  
+4. **Ground Truth Scoring `data/test/test_query.csv`**  
    Each `(query, item)` pair is rated for semantic relevance on a **0–10 scale** using **GPT-4.1-mini**.
    Then I performed a sampling inspection.
+5. **Evaluation method**
 
-   
-```
-================================================================================
-  ✓ Updated 2576 scores
+   I used `data/test/30_queries.csv` as the input queries for search in `data/raw/5k_items.csv`.  
+   The retrieved ranking results were compared against the LLM scores stored in `data/test/test_query.csv`.  
+   If an item was not found in `data/test/test_query.csv`, it was treated as having a score of 0.  
+   The benchmark process then generated the evaluation report based on these comparisons.
 
-Statistics:
-  • Total pairs: 2576
-  • Pairs with scores: 2576
-  • Pairs without scores: 0
-  • Average score: 3.52/10
-  • High relevance (≥5): 751 (29.2%)
-  • Low relevance (<5): 1825 (70.8%)
 
-================================================================================
-Scoring completed!
-================================================================================
-```
 
-### ❌ Failed Attempts
+> [test_set.md](docs/test_set.md)
 
-1. **Random Sampling**  
-   Randomly selected 10 queries and 500 items for scoring →  
-   The 500 items were too random, resulting in extremely sparse relevance scores, most pairs received 0 and were unusable.
-
-2. **GPT-Generated Relevant Items**  
-   Based on (1), used GPT to generate strongly related items for the 10 queries and mixed them into the 500-item pool →  
-   The relevance was *too strong* and overly specific, causing the text retriever (BM25) to easily capture them, thus failing to reflect true *semantic* retrieval performance.
-
-3. **Manual Labeling**  
-   Tried human labeling →  
-   Too much data to handle manually and time-consuming.
+> [metrics.md](docs/metrics.md)
 
 ## Components and Experiments
 
 Detailed evaluation reports and params setting are available in `artifacts/eval_runs`.  
 If you want to run the experiments yourself, execute the scripts under `scripts/evaluation`, but make sure to complete the prerequisites first and verify the parameter settings in each script’s `main` function.
 
-### Experiment Environment
+> [hardware.md](docs/hardware.md)
 
-```
-Hardware Configuration:
-  Platform: macOS-15.6.1-arm64-arm-64bit-Mach-O
-  Processor: arm
-  Machine: arm64
-  Architecture: 64bit
-  CPU Count: 8
-  CPU Frequency: 3504.00 MHz
-  Total Memory: 16.00 GB
-  GPU: Apple Metal (MPS)
-  GPU Memory: N/A
-  Python Version: 3.13.2
-```
-
+> [model_compare.md](docs/model_compare.md)
 
 ### Text Retriever (BM25)
 
@@ -216,30 +182,40 @@ I also tried both text-embedding-3-small and text-embedding-3-large, but embeddi
 
 ### Hybrid Retriever
 
-Concurrent text retriever + vector retriever (top-50 + top-50) → RRF fusion (top-20) → filtering → reranker → top-10
+Concurrent text retriever (BM25) + vector retriever ((BAAI/bge-m3)) (top-50 + top-50) → RRF fusion (top-20) → filtering → reranker ((BAAI/bge-reranker-v2-m3) → top-10
 
 
 
-| Metric | Average (ms) | Max (ms) | Min (ms) |
-|:--|--:|--:|--:|
-| **Overall Latency** | 1851.93 | 4071.48 | 1124.13 |
+| Model name | Metric          | Average (ms) | Max (ms) | Min (ms) |
+|-----------|:----------------|--:|--:|--:|
+|   BAAI/bge-reranker-v2-m3        | Overall Latency | 1851.93 | 4071.48 | 1124.13 |
+|   BAAI/bge-reranker-base        | Overall Latency |  646.56       |  1352.96       |   404.41      |
 
 
-| Stage | Avg (ms) | Max (ms) | Min (ms) | 
-|:--|--:|--:|--:|
-| **BM25 Retrieval** | 16.80 | 162.80 | 7.32 | 
-| **Vector Retrieval** | 82.39 | 357.26 | 42.31 |
-| **RRF Fusion / Merge** | 0.16 | 0.27 | 0.09 | 
-| **Cross-Encoder Re-ranking** | 1767.78 | 4013.13 | 761.19 | 
+| Model name              | Stage | Avg (ms) | Max (ms) | Min (ms) | 
+|-------------------------|:--|---------:|--:|--:|
+| BAAI/bge-reranker-v2-m3 | **BM25 Retrieval** |    16.80 | 162.80 | 7.32 | 
+| BAAI/bge-reranker-v2-m3 | **Vector Retrieval** |    82.39 | 357.26 | 42.31 |
+| BAAI/bge-reranker-v2-m3 | **RRF Fusion / Merge** |     0.16 | 0.27 | 0.09 | 
+| BAAI/bge-reranker-v2-m3 | **Cross-Encoder Re-ranking** |  1767.78 | 4013.13 | 761.19 | 
+| BAAI/bge-reranker-base  | **BM25 Retrieval** |    24.50 | 351.15 |  7.65 | 
+| BAAI/bge-reranker-base  | **Vector Retrieval** |    73.64 | 404.64 | 37.76 |
+| BAAI/bge-reranker-base  | **RRF Fusion / Merge** |         0.17 | 0.32 | 0.09 | 
+| BAAI/bge-reranker-base  | **Cross-Encoder Re-ranking** |  571.01 | 1310.14 | 281.81 | 
 
 
-| Metric | Precision | Recall | NDCG |
-|:--|--:|--:|--:|
-| **@K = 5** | 0.5733 | 0.2494 | 0.7141 |
-| **@K = 10** | 0.5033 | 0.3726 | 0.7321 |
+| Model name              | Metric | Precision | Recall | NDCG |
+|-------------------------|:--|--:|--:|--:|
+| BAAI/bge-reranker-v2-m3 | **@K = 5** | 0.5733 | 0.2494 | 0.7141 |
+| BAAI/bge-reranker-v2-m3 | **@K = 10** | 0.5033 | 0.3726 | 0.7321 |
+| BAAI/bge-reranker-base  | **@K = 5** | 0.4933 | 0.1656 | 0.6384 |
+| BAAI/bge-reranker-base  | **@K = 10** | 0.4400 | 0.2856 | 0.6709 |
 
 ### Evaluation and Reflection
 
+My approach/choice: 
+
+Concurrent text retriever (BM25) + vector retriever ((BAAI/bge-m3)) (top-50 + top-50) → RRF fusion (top-20) → filtering → reranker ((BAAI/bge-reranker-v2-m3) → top-10
 
 | Metric | My Result | Typical Range (Ref: MS MARCO / BEIR / MTEB) | Evaluation |
 |:--|:---------:|:--:|:----------:|
