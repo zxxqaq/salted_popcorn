@@ -127,9 +127,9 @@ TIMING BREAKDOWN
 
 4. **Ground Truth Scoring**  
    Each `(query, item)` pair is rated for semantic relevance on a **0–10 scale** using **GPT-4.1-mini**.
+   Then I performed a sampling inspection.
 
-
-
+   
 ```
 ================================================================================
   ✓ Updated 2576 scores
@@ -163,7 +163,7 @@ Scoring completed!
 
 ## Components and Experiments
 
-Detailed evaluation reports are available in `artifacts/eval_runs`.  
+Detailed evaluation reports and params setting are available in `artifacts/eval_runs`.  
 If you want to run the experiments yourself, execute the scripts under `scripts/evaluation`, but make sure to complete the prerequisites first and verify the parameter settings in each script’s `main` function.
 
 ### Experiment Environment
@@ -199,15 +199,18 @@ Hardware Configuration:
 
 | Model name                                                      | Average (ms) | Max (ms) | Min (ms) |
 |-----------------------------------------------------------------|:------------:|:--------:|:--------:|
-| **BAAI/bge-m3**                                                 |    59.25     |  284.47   |  33.55  |
+| **BAAI/bge-m3**                                                 |    59.25     |  284.47  |  33.55   |
+| **BAAI/bge-m3 no HNSW index**                                   |    74.70     |  252.62  |  47.81   |
 | **sentence-transformers/paraphrase-multilingual-MiniLM-L12-v2** |    22.67     |  149.13  |   8.42   |
 
-| Model name | Metric | Precision | Recall | NDCG | 
-|------------|:--------|:---------:|:------:|:------:|
-|      **BAAI/bge-m3**          | **@K=5**  |  0.5067   | 0.2244 | 0.6697 | 
-|      **BAAI/bge-m3**          | **@K=10** |  0.4700   | 0.3112 | 0.6963 | 
-|       **sentence-transformers/paraphrase-multilingual-MiniLM-L12-v2**                        | **@K=5**  |  0.2267   | 0.1517 | 0.3351 |
-|       **sentence-transformers/paraphrase-multilingual-MiniLM-L12-v2**                        | **@K=10** |  0.1933   | 0.1774 | 0.3125 | 
+| Model name                                                      | Metric    | Precision | Recall | NDCG | 
+|-----------------------------------------------------------------|:----------|:---------:|:------:|:------:|
+| **BAAI/bge-m3**                                                 | **@K=5**  |  0.5067   | 0.2244 | 0.6697 | 
+| **BAAI/bge-m3**                                                 | **@K=10** |  0.4700   | 0.3112 | 0.6963 | 
+| **BAAI/bge-m3 no HNSW index**                                   | **@K=5**  |  0.4867   | 0.2244 | 0.6503 | 
+| **BAAI/bge-m3 no HNSW index**                                   | **@K=10** |  0.4533   | 0.3012 | 0.6687 | 
+| **sentence-transformers/paraphrase-multilingual-MiniLM-L12-v2** | **@K=5**  |  0.2267   | 0.1517 | 0.3351 |
+| **sentence-transformers/paraphrase-multilingual-MiniLM-L12-v2** | **@K=10** |  0.1933   | 0.1774 | 0.3125 | 
 
 I also tried both text-embedding-3-small and text-embedding-3-large, but embedding through the API takes around 1 second per query, which is too slow. It also depends on the network speed and OpenAI’s service performance, and the token usage is billed, making it quite expensive for large-scale datasets and high concurrency queries.
 
@@ -222,12 +225,12 @@ Concurrent text retriever + vector retriever (top-50 + top-50) → RRF fusion (t
 | **Overall Latency** | 1851.93 | 4071.48 | 1124.13 |
 
 
-| Stage | Avg (ms) | Max (ms) | Min (ms) | Notes |
-|:--|--:|--:|--:|:--|
-| **BM25 Retrieval** | 16.80 | 162.80 | 7.32 | Text-based retrieval |
-| **Vector Retrieval** | 82.39 | 357.26 | 42.31 | HNSW + Embedding Search |
-| **RRF Fusion / Merge** | 0.16 | 0.27 | 0.09 | Reciprocal Rank Fusion |
-| **Cross-Encoder Re-ranking** | 1767.78 | 4013.13 | 761.19 | Re-ranking with BGE Reranker |
+| Stage | Avg (ms) | Max (ms) | Min (ms) | 
+|:--|--:|--:|--:|
+| **BM25 Retrieval** | 16.80 | 162.80 | 7.32 | 
+| **Vector Retrieval** | 82.39 | 357.26 | 42.31 |
+| **RRF Fusion / Merge** | 0.16 | 0.27 | 0.09 | 
+| **Cross-Encoder Re-ranking** | 1767.78 | 4013.13 | 761.19 | 
 
 
 | Metric | Precision | Recall | NDCG |
