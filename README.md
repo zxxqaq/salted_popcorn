@@ -1,6 +1,6 @@
 
 ## Intro
-A semantic search system that matches natural language food queries to the most relevant food items in our dataset.
+The introduction section has been removed to prevent the project from being easily discoverable via search on github.
 
 ## Quick-start 🚀
 

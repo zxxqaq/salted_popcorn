@@ -47,9 +47,9 @@ Hardware Configuration:
 
 Latency Statistics:
 --------------------------------------------------------------------------------
-Average Latency: 59.25 ms
-Max Latency: 284.47 ms
-Min Latency: 33.55 ms
+Average Latency: 47.12 ms
+Max Latency: 86.70 ms
+Min Latency: 32.21 ms
 
 Aggregate Metrics:
 --------------------------------------------------------------------------------
